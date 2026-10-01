@@ -22,6 +22,7 @@ generation_result_t generator_generate(generator_context_t *ctx,
                                        const char *question,
                                        const search_result_t *retrieved,
                                        int retrieved_count,
+                                       float similarity_threshold,
                                        float confidence_threshold);
 
 void generation_result_free(generation_result_t *res);

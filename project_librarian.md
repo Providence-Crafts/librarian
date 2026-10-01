@@ -228,18 +228,18 @@ Implement the document text chunker with sliding window and overlap, and the emb
 Implement generative inference using `llama.h`, prompt assembly with retrieved context, token logprob calculation, and the two-stage hallucination refusal logic.
 
 **Tasks**
-- [ ] Implement generative model loader and context initialization in `src/generator.c` and `include/generator.h` (`MiniCPM5-2B-Q8_0.gguf`).
-- [ ] Format prompt template with retrieved context and system instruction to return `[INSUFFICIENT_DATA]` when uncertain.
-- [ ] Implement autoregressive generation loop with temperature, top-k/top-p sampling, and token logprob accumulation.
-- [ ] Compute mean sequence confidence $C_{\text{gen}} = \exp(\frac{1}{N} \sum_{i=1}^N \ln P(t_i))$.
-- [ ] Implement Stage 1 refusal: reject if top retrieval match $S < \tau_{\text{retrieval}}$ before running generator.
-- [ ] Implement Stage 2 refusal: reject if model outputs `[INSUFFICIENT_DATA]` OR $C_{\text{gen}} < \tau_{\text{gen}}$.
-- [ ] Write unit tests in `tests/test_generator.c`.
+- [✓] Implement generative model loader and context initialization in `src/generator.c` and `include/generator.h` (`MiniCPM5-2B-Q8_0.gguf`).
+- [✓] Format prompt template with retrieved context and system instruction to return `[INSUFFICIENT_DATA]` when uncertain.
+- [✓] Implement autoregressive generation loop with temperature, top-k/top-p sampling, and token logprob accumulation.
+- [✓] Compute mean sequence confidence $C_{\text{gen}} = \exp(\frac{1}{N} \sum_{i=1}^N \ln P(t_i))$.
+- [✓] Implement Stage 1 refusal: reject if top retrieval match $S < \tau_{\text{retrieval}}$ before running generator.
+- [✓] Implement Stage 2 refusal: reject if model outputs `[INSUFFICIENT_DATA]` OR $C_{\text{gen}} < \tau_{\text{gen}}$.
+- [✓] Write unit tests in `tests/test_generator.c`.
 
 **Checks**
-- [ ] Model successfully generates answers grounded in provided context.
-- [ ] Queries without matching documents in DB are refused immediately at Stage 1.
-- [ ] Hallucinated or ambiguous queries trigger Stage 2 refusal badge.
+- [✓] Model successfully generates answers grounded in provided context.
+- [✓] Queries without matching documents in DB are refused immediately at Stage 1.
+- [✓] Hallucinated or ambiguous queries trigger Stage 2 refusal badge.
 
 ---
 

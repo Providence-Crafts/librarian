@@ -170,16 +170,16 @@ Set up vendor dependencies (`tomlc99`, `sqlite3`, `sqlite-vec`, `llama.cpp` stat
 Implement the configuration module (`librarian.toml` loader) using `tomlc99`, and the pastel terminal UI module featuring ANSI escape styling, Minecraft bookshelf banner, progress indicators, and confidence badges.
 
 **Tasks**
-- [ ] Define configuration structures and API in `include/config.h` (`database`, `embedder`, `generator` settings).
-- [ ] Implement TOML parser in `src/config.c` using `tomlc99`, handling defaults and missing keys.
-- [ ] Implement `include/ui.h` and `src/ui.c` with pastel 24-bit ANSI colors (Lavender, Mint Green, Soft Peach, Powder Blue, Muted Gray, Reset).
-- [ ] Add Minecraft bookshelf ASCII banner rendering and formatted confidence badges to `src/ui.c`.
-- [ ] Write unit tests in `tests/test_config.c` and `tests/test_ui.c` using `minunit.h`.
+- [✓] Define configuration structures and API in `include/config.h` (`database`, `embedder`, `generator` settings).
+- [✓] Implement TOML parser in `src/config.c` using `tomlc99`, handling defaults and missing keys.
+- [✓] Implement `include/ui.h` and `src/ui.c` with pastel 24-bit ANSI colors (Lavender, Mint Green, Soft Peach, Powder Blue, Muted Gray, Reset).
+- [✓] Add Minecraft bookshelf ASCII banner rendering and formatted confidence badges to `src/ui.c`.
+- [✓] Write unit tests in `tests/test_config.c` and `tests/test_ui.c` using `minunit.h`.
 
 **Checks**
-- [ ] Configuration correctly parses sample `librarian.toml` and populates struct fields.
-- [ ] UI banner renders correctly in terminal without color artifacts or line breaks.
-- [ ] `make test` runs and passes with AddressSanitizer enabled.
+- [✓] Configuration correctly parses sample `librarian.toml` and populates struct fields.
+- [✓] UI banner renders correctly in terminal without color artifacts or line breaks.
+- [✓] `make test` runs and passes with AddressSanitizer enabled.
 
 ---
 

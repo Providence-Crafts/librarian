@@ -189,17 +189,17 @@ Implement the configuration module (`librarian.toml` loader) using `tomlc99`, an
 Implement SQLite3 database initialization with `sqlite-vec` vector extension statically linked, schema migration, chunk storage, and KNN vector similarity queries.
 
 **Tasks**
-- [ ] Define DB interface in `include/db.h` (`db_open`, `db_close`, `db_insert_document`, `db_insert_chunk`, `db_search_knn`, `db_get_stats`).
-- [ ] Implement `src/db.c` with `sqlite3_auto_extension((void (*)(void))sqlite3_vec_init)` under `-DSQLITE_VEC_STATIC`.
-- [ ] Create database tables: `documents`, `chunks`, and virtual vector table `vec_chunks USING vec0(...)`.
-- [ ] Implement single-transaction bulk chunk and vector insertion.
-- [ ] Implement KNN vector search returning top-$K$ chunks with cosine/L2 distance and similarity score $S = 1.0 - \text{distance}$.
-- [ ] Write unit tests in `tests/test_db.c` validating insertion and KNN search.
+- [✓] Define DB interface in `include/db.h` (`db_open`, `db_close`, `db_insert_document`, `db_insert_chunk`, `db_search_knn`, `db_get_stats`).
+- [✓] Implement `src/db.c` with `sqlite3_auto_extension((void (*)(void))sqlite3_vec_init)` under `-DSQLITE_VEC_STATIC`.
+- [✓] Create database tables: `documents`, `chunks`, and virtual vector table `vec_chunks USING vec0(...)`.
+- [✓] Implement single-transaction bulk chunk and vector insertion.
+- [✓] Implement KNN vector search returning top-$K$ chunks with cosine/L2 distance and similarity score $S = 1.0 - \text{distance}$.
+- [✓] Write unit tests in `tests/test_db.c` validating insertion and KNN search.
 
 **Checks**
-- [ ] Vector table creates successfully and accepts float vector embeddings.
-- [ ] KNN search returns closest matches ranked by distance.
-- [ ] Valgrind and ASan report zero memory leaks or uninitialized reads on DB lifecycle.
+- [✓] Vector table creates successfully and accepts float vector embeddings.
+- [✓] KNN search returns closest matches ranked by distance.
+- [✓] Valgrind and ASan report zero memory leaks or uninitialized reads on DB lifecycle.
 
 ---
 

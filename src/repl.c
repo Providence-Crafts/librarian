@@ -40,7 +40,13 @@ typedef enum {
 } repl_key_t;
 
 typedef struct {
-    char **items;
+    char *insert_text;
+    char *display_text;
+    bool is_dir;
+} candidate_item_t;
+
+typedef struct {
+    candidate_item_t *items;
     size_t count;
     size_t cap;
     size_t replace_from;
@@ -241,28 +247,38 @@ static void candidate_list_init(candidate_list_t *list, size_t replace_from)
     list->replace_from = replace_from;
 }
 
-static void candidate_list_add(candidate_list_t *list, const char *str)
+static void candidate_list_add(candidate_list_t *list, const char *insert_text,
+                               const char *display_text, bool is_dir)
 {
     if (list->count >= list->cap) {
         size_t new_cap = list->cap == 0 ? 8 : list->cap * 2;
-        char **grown = (char **)realloc(list->items, new_cap * sizeof(char *));
-        if (!grown)
+        candidate_item_t *grown =
+            (candidate_item_t *)realloc(list->items, new_cap * sizeof(candidate_item_t));
+        if (!grown) {
             return;
+        }
         list->items = grown;
         list->cap = new_cap;
     }
-    list->items[list->count] = strdup(str);
-    if (list->items[list->count]) {
+    list->items[list->count].insert_text = strdup(insert_text);
+    list->items[list->count].display_text = strdup(display_text ? display_text : insert_text);
+    list->items[list->count].is_dir = is_dir;
+    if (list->items[list->count].insert_text && list->items[list->count].display_text) {
         list->count++;
+    } else {
+        free(list->items[list->count].insert_text);
+        free(list->items[list->count].display_text);
     }
 }
 
 static void candidate_list_free(candidate_list_t *list)
 {
-    if (!list)
+    if (!list) {
         return;
+    }
     for (size_t i = 0; i < list->count; i++) {
-        free(list->items[i]);
+        free(list->items[i].insert_text);
+        free(list->items[i].display_text);
     }
     free(list->items);
     list->items = NULL;
@@ -270,37 +286,107 @@ static void candidate_list_free(candidate_list_t *list)
     list->cap = 0;
 }
 
+static int candidate_cmp(const void *a, const void *b)
+{
+    const candidate_item_t *ca = (const candidate_item_t *)a;
+    const candidate_item_t *cb = (const candidate_item_t *)b;
+    if (ca->is_dir != cb->is_dir) {
+        return ca->is_dir ? -1 : 1;
+    }
+    return strcmp(ca->display_text, cb->display_text);
+}
+
+static size_t common_prefix_length(const candidate_list_t *list)
+{
+    if (!list || list->count == 0) {
+        return 0;
+    }
+    size_t len = 0;
+    while (1) {
+        char ch = list->items[0].insert_text[len];
+        if (ch == '\0') {
+            break;
+        }
+        for (size_t i = 1; i < list->count; i++) {
+            if (list->items[i].insert_text[len] != ch) {
+                return len;
+            }
+        }
+        len++;
+    }
+    return len;
+}
+
 static void generate_candidates(const char *buf, size_t cursor, candidate_list_t *list)
 {
-    static const char *commands[] = {"/help",  "/ingest ", "/stats", "/config",
-                                     "/clear", "/exit",    "/quit"};
-    static const size_t num_commands = sizeof(commands) / sizeof(commands[0]);
-
-    /* If starts with /ingest, do filesystem path autocompletion */
+    /* If starts with /ingest, do zsh-style filesystem path autocompletion */
     if (strncmp(buf, "/ingest", 7) == 0 && (buf[7] == ' ' || buf[7] == '\0')) {
         const char *arg = buf + 7;
-        while (*arg == ' ')
+        while (*arg == ' ') {
             arg++;
+        }
 
         size_t arg_offset = (size_t)(arg - buf);
         candidate_list_init(list, arg_offset);
 
-        char dir_part[512] = ".";
-        char file_prefix[256] = "";
+        char fs_dir[1024];
+        char file_prefix[256];
+        char disp_prefix[1024];
 
-        const char *last_slash = strrchr(arg, '/');
-        if (last_slash) {
-            size_t dlen = (size_t)(last_slash - arg) + 1;
-            if (dlen >= sizeof(dir_part))
-                dlen = sizeof(dir_part) - 1;
-            strncpy(dir_part, arg, dlen);
-            dir_part[dlen] = '\0';
-            strncpy(file_prefix, last_slash + 1, sizeof(file_prefix) - 1);
+        fs_dir[0] = '\0';
+        file_prefix[0] = '\0';
+        disp_prefix[0] = '\0';
+
+        bool has_tilde = (arg[0] == '~' && (arg[1] == '/' || arg[1] == '\0'));
+        if (has_tilde) {
+            const char *home = getenv("HOME");
+            if (!home) {
+                home = "/";
+            }
+            const char *after = arg + 1;
+            if (*after == '/') {
+                after++;
+            }
+            const char *last_slash = strrchr(after, '/');
+            if (last_slash) {
+                size_t sublen = (size_t)(last_slash - after) + 1;
+                char sub_dir[512];
+                if (sublen >= sizeof(sub_dir)) {
+                    sublen = sizeof(sub_dir) - 1;
+                }
+                strncpy(sub_dir, after, sublen);
+                sub_dir[sublen] = '\0';
+
+                snprintf(fs_dir, sizeof(fs_dir), "%s/%s", home, sub_dir);
+                snprintf(disp_prefix, sizeof(disp_prefix), "~/%s", sub_dir);
+                strncpy(file_prefix, last_slash + 1, sizeof(file_prefix) - 1);
+            } else {
+                snprintf(fs_dir, sizeof(fs_dir), "%s", home);
+                snprintf(disp_prefix, sizeof(disp_prefix), "~/");
+                strncpy(file_prefix, after, sizeof(file_prefix) - 1);
+            }
         } else {
-            strncpy(file_prefix, arg, sizeof(file_prefix) - 1);
+            const char *last_slash = strrchr(arg, '/');
+            if (last_slash) {
+                size_t dlen = (size_t)(last_slash - arg) + 1;
+                if (dlen >= sizeof(fs_dir)) {
+                    dlen = sizeof(fs_dir) - 1;
+                }
+                strncpy(fs_dir, arg, dlen);
+                fs_dir[dlen] = '\0';
+                strncpy(disp_prefix, fs_dir, sizeof(disp_prefix) - 1);
+                strncpy(file_prefix, last_slash + 1, sizeof(file_prefix) - 1);
+            } else {
+                snprintf(fs_dir, sizeof(fs_dir), ".");
+                disp_prefix[0] = '\0';
+                strncpy(file_prefix, arg, sizeof(file_prefix) - 1);
+            }
         }
+        file_prefix[sizeof(file_prefix) - 1] = '\0';
+        disp_prefix[sizeof(disp_prefix) - 1] = '\0';
+        fs_dir[sizeof(fs_dir) - 1] = '\0';
 
-        DIR *d = opendir(dir_part);
+        DIR *d = opendir(fs_dir);
         if (d) {
             const struct dirent *de;
             size_t plen = strlen(file_prefix);
@@ -312,32 +398,29 @@ static void generate_candidates(const char *buf, size_t cursor, candidate_list_t
                     continue;
                 }
                 if (strncmp(de->d_name, file_prefix, plen) == 0) {
-                    char full[1024];
-                    bool is_dir = false;
+                    char stat_path[2048];
+                    snprintf(stat_path, sizeof(stat_path), "%s/%s", fs_dir, de->d_name);
                     struct stat st;
-                    char stat_path[1024];
-                    if (strcmp(dir_part, ".") == 0) {
-                        snprintf(stat_path, sizeof(stat_path), "%s", de->d_name);
-                    } else {
-                        snprintf(stat_path, sizeof(stat_path), "%s%s", dir_part, de->d_name);
-                    }
+                    bool is_dir = (stat(stat_path, &st) == 0 && S_ISDIR(st.st_mode));
 
-                    if (stat(stat_path, &st) == 0 && S_ISDIR(st.st_mode)) {
-                        is_dir = true;
-                    }
+                    char insert_text[2048];
+                    snprintf(insert_text, sizeof(insert_text), "%s%s%s", disp_prefix, de->d_name,
+                             is_dir ? "/" : " ");
 
-                    if (strcmp(dir_part, ".") == 0) {
-                        snprintf(full, sizeof(full), "%s%s", de->d_name, is_dir ? "/" : " ");
-                    } else {
-                        snprintf(full, sizeof(full), "%s%s%s", dir_part, de->d_name,
-                                 is_dir ? "/" : " ");
-                    }
-                    candidate_list_add(list, full);
-                    if (list->count >= REPL_MAX_MENU_ITEMS)
+                    char display_text[512];
+                    snprintf(display_text, sizeof(display_text), "%s%s", de->d_name,
+                             is_dir ? "/" : "");
+
+                    candidate_list_add(list, insert_text, display_text, is_dir);
+                    if (list->count >= REPL_MAX_MENU_ITEMS) {
                         break;
+                    }
                 }
             }
             closedir(d);
+            if (list->count > 1) {
+                qsort(list->items, list->count, sizeof(candidate_item_t), candidate_cmp);
+            }
         }
         return;
     }
@@ -354,9 +437,28 @@ static void generate_candidates(const char *buf, size_t cursor, candidate_list_t
     const char *prefix = buf + word_start;
     size_t prefix_len = (cursor > word_start) ? (cursor - word_start) : 0;
 
-    for (size_t i = 0; i < num_commands; i++) {
-        if (prefix_len == 0 || strncmp(commands[i], prefix, prefix_len) == 0) {
-            candidate_list_add(list, commands[i]);
+    static const char *default_commands[] = {"/help",   "/ingest ", "/stats",
+                                             "/config", "/clear",   "/exit"};
+    static const size_t num_default = sizeof(default_commands) / sizeof(default_commands[0]);
+
+    if (prefix_len <= 1) {
+        /* General Tab / empty / just "/" -> show default commands (includes /exit, excludes /quit)
+         */
+        for (size_t i = 0; i < num_default; i++) {
+            if (prefix_len == 0 || strncmp(default_commands[i], prefix, prefix_len) == 0) {
+                candidate_list_add(list, default_commands[i], default_commands[i], false);
+            }
+        }
+    } else {
+        /* Specific prefix typed: check all commands including /quit */
+        static const char *all_commands[] = {"/help",  "/ingest ", "/stats", "/config",
+                                             "/clear", "/exit",    "/quit"};
+        static const size_t num_all = sizeof(all_commands) / sizeof(all_commands[0]);
+
+        for (size_t i = 0; i < num_all; i++) {
+            if (strncmp(all_commands[i], prefix, prefix_len) == 0) {
+                candidate_list_add(list, all_commands[i], all_commands[i], false);
+            }
         }
     }
 }
@@ -376,8 +478,9 @@ static void redraw_prompt_and_line(const char *prompt, const char *buf, size_t l
 
 static void clear_menu_display(size_t rows_drawn)
 {
-    if (rows_drawn == 0)
+    if (rows_drawn == 0) {
         return;
+    }
     for (size_t r = 0; r < rows_drawn; r++) {
         printf("\r\n\x1b[K");
     }
@@ -386,37 +489,128 @@ static void clear_menu_display(size_t rows_drawn)
     fflush(stdout);
 }
 
-static size_t render_completion_menu(const candidate_list_t *list, size_t selected)
+static size_t render_completion_menu(const candidate_list_t *list, size_t selected,
+                                     size_t *out_cols)
 {
-    if (!list || list->count == 0)
-        return 0;
-
-    size_t drawn_rows = 0;
-    printf("\r\n\x1b[K");
-    drawn_rows++;
-
-    /* Display candidates in clean horizontal cards with pastel highlights */
-    for (size_t i = 0; i < list->count; i++) {
-        if (i == selected) {
-            printf(COLOR_LAVENDER COLOR_BOLD "► %s " COLOR_RESET, list->items[i]);
-        } else {
-            printf(COLOR_GRAY "  %s " COLOR_RESET, list->items[i]);
+    if (!list || list->count == 0) {
+        if (out_cols) {
+            *out_cols = 1;
         }
-        if ((i + 1) % 4 == 0 && i + 1 < list->count) {
-            printf("\r\n\x1b[K");
-            drawn_rows++;
+        return 0;
+    }
+
+    int term_w = 80;
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 20) {
+        term_w = ws.ws_col;
+    }
+
+    size_t max_len = 0;
+    for (size_t i = 0; i < list->count; i++) {
+        size_t l = strlen(list->items[i].display_text);
+        if (l > max_len) {
+            max_len = l;
         }
     }
 
-    printf("\r\n\x1b[K" COLOR_GRAY
-           "  (Tab/Arrows: navigate • Enter: select • Esc: cancel)" COLOR_RESET);
+    size_t cellw = max_len + 4;
+    if (cellw < 12) {
+        cellw = 12;
+    }
+    if ((int)cellw > term_w - 4) {
+        cellw = (size_t)(term_w - 4);
+    }
+
+    size_t cols = (size_t)term_w / cellw;
+    if (cols < 1) {
+        cols = 1;
+    }
+    if (cols > 6) {
+        cols = 6;
+    }
+    if (cols > list->count) {
+        cols = list->count;
+    }
+    if (out_cols) {
+        *out_cols = cols;
+    }
+
+    size_t rows = (list->count + cols - 1) / cols;
+    size_t drawn_rows = 0;
+
+    for (size_t r = 0; r < rows; r++) {
+        printf("\r\n\x1b[K");
+        drawn_rows++;
+        for (size_t c = 0; c < cols; c++) {
+            size_t idx = r * cols + c;
+            if (idx >= list->count) {
+                break;
+            }
+
+            const char *disp = list->items[idx].display_text;
+            bool is_dir = list->items[idx].is_dir;
+
+            if (idx == selected) {
+                /* Selected: Inverse highlight pill with no bullets */
+                if (is_dir) {
+                    printf("\x1b[30;48;5;110;1m %-*s \x1b[0m", (int)(cellw - 2), disp);
+                } else {
+                    printf("\x1b[30;48;5;189;1m %-*s \x1b[0m", (int)(cellw - 2), disp);
+                }
+            } else {
+                /* Unselected: clean pastel text */
+                if (is_dir) {
+                    printf("\x1b[38;5;110;1m  %-*s\x1b[0m", (int)(cellw - 2), disp);
+                } else {
+                    printf("\x1b[38;5;252m  %-*s\x1b[0m", (int)(cellw - 2), disp);
+                }
+            }
+        }
+    }
+
+    printf("\r\n\x1b[K\x1b[38;5;244m  (Tab/Arrows: navigate • Enter: select • Esc: cancel)\x1b[0m");
     drawn_rows++;
 
-    /* Move cursor back up to the prompt line */
+    /* Move cursor back up to prompt line */
     printf("\x1b[%dA", (int)drawn_rows);
-    fflush(stdout);
+    (void)fflush(stdout);
 
     return drawn_rows;
+}
+
+static size_t menu_move_down(size_t cur, size_t count, size_t cols)
+{
+    if (count <= 1 || cols == 0) {
+        return 0;
+    }
+    size_t col = cur % cols;
+    size_t next = cur + cols;
+    if (next < count) {
+        return next;
+    }
+    return col;
+}
+
+static size_t menu_move_up(size_t cur, size_t count, size_t cols)
+{
+    if (count <= 1 || cols == 0) {
+        return 0;
+    }
+    size_t col = cur % cols;
+    if (cur >= cols) {
+        return cur - cols;
+    }
+    size_t total_rows = (count + cols - 1) / cols;
+    size_t last_row = total_rows - 1;
+    size_t target = last_row * cols + col;
+    if (target >= count) {
+        if (last_row > 0) {
+            target = (last_row - 1) * cols + col;
+        } else {
+            target = cur;
+        }
+    }
+    return target;
 }
 
 static void repl_history_push(repl_context_t *repl, const char *line)
@@ -577,6 +771,7 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
     bool menu_active = false;
     size_t menu_sel = 0;
     size_t menu_rows = 0;
+    size_t menu_cols = 1;
     candidate_list_t candidates;
     candidate_list_init(&candidates, 0);
 
@@ -585,26 +780,42 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
         repl_key_t key = read_key(repl->tty_fd, &ch);
 
         if (menu_active) {
-            if (key == KEY_TAB || key == KEY_ARROW_RIGHT || key == KEY_ARROW_DOWN) {
+            if (key == KEY_TAB || key == KEY_ARROW_RIGHT) {
                 if (candidates.count > 0) {
                     menu_sel = (menu_sel + 1) % candidates.count;
                     clear_menu_display(menu_rows);
-                    menu_rows = render_completion_menu(&candidates, menu_sel);
+                    menu_rows = render_completion_menu(&candidates, menu_sel, &menu_cols);
                     redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
                 }
                 continue;
-            } else if (key == KEY_SHIFT_TAB || key == KEY_ARROW_LEFT || key == KEY_ARROW_UP) {
+            } else if (key == KEY_SHIFT_TAB || key == KEY_ARROW_LEFT) {
                 if (candidates.count > 0) {
                     menu_sel = (menu_sel == 0) ? candidates.count - 1 : menu_sel - 1;
                     clear_menu_display(menu_rows);
-                    menu_rows = render_completion_menu(&candidates, menu_sel);
+                    menu_rows = render_completion_menu(&candidates, menu_sel, &menu_cols);
+                    redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
+                }
+                continue;
+            } else if (key == KEY_ARROW_DOWN) {
+                if (candidates.count > 0) {
+                    menu_sel = menu_move_down(menu_sel, candidates.count, menu_cols);
+                    clear_menu_display(menu_rows);
+                    menu_rows = render_completion_menu(&candidates, menu_sel, &menu_cols);
+                    redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
+                }
+                continue;
+            } else if (key == KEY_ARROW_UP) {
+                if (candidates.count > 0) {
+                    menu_sel = menu_move_up(menu_sel, candidates.count, menu_cols);
+                    clear_menu_display(menu_rows);
+                    menu_rows = render_completion_menu(&candidates, menu_sel, &menu_cols);
                     redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
                 }
                 continue;
             } else if (key == KEY_ENTER) {
                 /* Accept selected completion */
                 if (candidates.count > 0 && menu_sel < candidates.count) {
-                    const char *choice = candidates.items[menu_sel];
+                    const char *choice = candidates.items[menu_sel].insert_text;
                     size_t from = candidates.replace_from;
                     size_t clen = strlen(choice);
 
@@ -800,7 +1011,7 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
                 (void)fflush(stdout);
             } else if (candidates.count == 1) {
                 /* Single match -> insert directly */
-                const char *choice = candidates.items[0];
+                const char *choice = candidates.items[0].insert_text;
                 size_t from = candidates.replace_from;
                 size_t clen = strlen(choice);
 
@@ -820,10 +1031,32 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
                 candidate_list_free(&candidates);
                 redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
             } else {
-                /* Multiple matches -> open completion menu */
+                /* Multiple matches -> expand common prefix if any */
+                size_t common_len = common_prefix_length(&candidates);
+                size_t from = candidates.replace_from;
+                size_t typed_len = (repl->cursor > from) ? (repl->cursor - from) : 0;
+
+                if (common_len > typed_len) {
+                    size_t needed = from + common_len + 1;
+                    if (needed >= repl->line_cap) {
+                        size_t ncap = (needed + 64) * 2;
+                        char *grown = (char *)realloc(repl->line_buf, ncap);
+                        if (grown) {
+                            repl->line_buf = grown;
+                            repl->line_cap = ncap;
+                        }
+                    }
+                    memcpy(repl->line_buf + from, candidates.items[0].insert_text, common_len);
+                    repl->line_len = from + common_len;
+                    repl->line_buf[repl->line_len] = '\0';
+                    repl->cursor = repl->line_len;
+                }
+
+                /* Open completion menu */
                 menu_active = true;
                 menu_sel = 0;
-                menu_rows = render_completion_menu(&candidates, menu_sel);
+                menu_cols = 1;
+                menu_rows = render_completion_menu(&candidates, menu_sel, &menu_cols);
                 redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
             }
             continue;

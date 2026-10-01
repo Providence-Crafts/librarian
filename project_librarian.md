@@ -300,3 +300,38 @@ Implement a full POSIX-termios line editor and tab completion engine inspired by
 - Decision: Redirect llama.cpp/ggml logs via `llama_log_set` callback to `data/librarian.log`.
   Rationale: Completely isolates internal backend diagnostics from the user-facing pastel UI while preserving detailed execution logs for auditing and debugging.
 
+---
+
+### Phase 8: Isometric Bookshelf Art, Robust Rotating Logger & Zsh-Style 2D Autocompletion
+
+**Description**
+Upgrade the UI banner to an accurate isometric 3D Minecraft bookshelf block matching user artwork, enhance the logging subsystem with thread-safe mutex locking, file rotation at 10 MB, millisecond timestamps, and log level filtering, and refine the interactive REPL with zsh-style autocompletion, `~/` home directory path expansion, non-bullet inverted pill highlighting, and true 2D grid arrow navigation.
+
+**Tasks**
+- [✓] Implement 24x24 isometric 3D Minecraft bookshelf pixel block banner using half-block Unicode characters (`▀`/`▄`) with truecolor 24-bit ANSI palette in `src/ui.c`.
+- [✓] Implement robust thread-safe logger in `include/logger.h` and `src/logger.c` with `pthread_mutex`, log rotation at 10 MB (`.1`), microsecond timestamps, and log level filtering (`DEBUG`, `INFO`, `WARN`, `ERROR`).
+- [✓] Update REPL command completion logic to discriminate between `/exit` and `/quit`: both are suggested when typing `/e` or `/q`, but general Tab only displays `/exit`.
+- [✓] Implement zsh-style path autocompletion in `src/repl.c` supporting `~/` home expansion, directory vs file styling, and common prefix auto-expansion.
+- [✓] Implement true 2D grid arrow navigation (Up and Down traverse rows across `menu_cols`, Left and Right traverse columns).
+- [✓] Implement modern inverted selection pill highlight without bullet markers in `render_completion_menu`.
+- [✓] Update unit tests in `tests/test_logger.c` and verify all tests pass under AddressSanitizer and UBSan.
+- [✓] Verify code formatting, compilation database (`bear`), and static analysis (`cppcheck`, `clang-tidy`).
+
+**Checks**
+- [✓] Isometric 3D bookshelf block renders cleanly in pastel colors matching user reference image.
+- [✓] Logger handles concurrent logging safely, rotates at 10 MB, and writes microsecond timestamped lines.
+- [✓] General Tab displays `/exit` without cluttering with duplicate `/quit`; typing `/q` suggests `/quit`.
+- [✓] `/ingest ~/` expands home directory and autocompletes subdirectories and files in zsh style.
+- [✓] Up and Down arrows move vertically across menu rows; Left and Right move horizontally across candidates.
+- [✓] Selected candidate is highlighted with a clean inverted background pill with no bullet symbols.
+- [✓] All 11 unit tests pass under ASan and UBSan; zero memory leaks, zero compiler warnings.
+
+**Design decisions**
+- Decision: Use 24x24 half-block ANSI truecolor rendering for the isometric block.
+  Rationale: Downsampling the reference 3D block to a 24x24 grid using top/bottom half block characters (`▀`/`▄`) produces pixel-crisp isometric projection without terminal distortion.
+- Decision: True 2D navigation arithmetic mapping grid coordinates `(row, col)` with modular row wrapping.
+  Rationale: Providing distinct vertical and horizontal navigation across the calculated terminal columns matches modern shell UX (zsh/fish) and allows intuitive browsing of large candidate sets.
+- Decision: Inverted pastel background highlight (`\x1b[30;48;5;189;1m`) rather than bullet pointers.
+  Rationale: Terminal emulators render solid highlight pills much more cleanly than glyph bullets, eliminating line wrapping jitter and alignment shifts.
+
+

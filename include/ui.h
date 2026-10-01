@@ -2,6 +2,7 @@
 #define LIBRARIAN_UI_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 /* Modern pastel 24-bit ANSI color escape codes */
 #define COLOR_LAVENDER "\x1b[38;2;189;147;249m"
@@ -17,6 +18,7 @@ void ui_banner(void);
 void ui_prompt(void);
 void ui_status(const char *status);
 void ui_clear_status(void);
+void ui_ingest_progress(size_t current, size_t total, const char *file_path);
 void ui_confidence_badge(float confidence, bool is_refusal);
 void ui_similarity_badge(float similarity, float threshold);
 

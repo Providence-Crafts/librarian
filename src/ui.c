@@ -2,6 +2,10 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 static const char *const g_banner_lines[12] = {
     "        "
@@ -149,6 +153,57 @@ void ui_status(const char *status)
 void ui_clear_status(void)
 {
     printf("\r\x1b[K");
+    fflush(stdout);
+}
+
+void ui_ingest_progress(size_t current, size_t total, const char *file_path)
+{
+    if (!isatty(STDOUT_FILENO)) {
+        return;
+    }
+    if (total == 0) {
+        return;
+    }
+
+    int pct = (int)((current * 100) / total);
+
+    int term_w = 80;
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 20) {
+        term_w = ws.ws_col;
+    }
+
+    /* Compact home path if applicable */
+    const char *disp_path = file_path;
+    char home_buf[1024];
+    const char *home = getenv("HOME");
+    if (home && strncmp(file_path, home, strlen(home)) == 0) {
+        snprintf(home_buf, sizeof(home_buf), "~%s", file_path + strlen(home));
+        disp_path = home_buf;
+    }
+
+    /* Reserve columns for prefix: "📦 Ingesting [1977/1977] (100%) • " */
+    char prefix[128];
+    snprintf(prefix, sizeof(prefix), "📦 Ingesting [%zu/%zu] (%d%%) • ", current, total, pct);
+    int pcol = (int)strlen(prefix);
+
+    int avail = term_w - pcol - 1;
+    if (avail < 10) {
+        avail = 10;
+    }
+
+    int path_len = (int)strlen(disp_path);
+    char path_buf[512];
+    if (path_len > avail && avail > 4) {
+        snprintf(path_buf, sizeof(path_buf), "...%s", disp_path + (path_len - (avail - 3)));
+    } else {
+        snprintf(path_buf, sizeof(path_buf), "%s", disp_path);
+    }
+
+    printf("\r\x1b[K" COLOR_LAVENDER COLOR_BOLD "📦 Ingesting [" COLOR_MINT "%zu/%zu" COLOR_LAVENDER
+           "] " COLOR_PEACH "(%3d%%)" COLOR_RESET " " COLOR_BLUE "•" COLOR_RESET " " COLOR_GRAY
+           "%s" COLOR_RESET,
+           current, total, pct, path_buf);
     fflush(stdout);
 }
 

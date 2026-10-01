@@ -61,7 +61,7 @@ static int ingest_single_file(db_context_t *db, embedder_context_t *emb, const c
 {
     char *content = read_entire_file(file_path);
     if (!content) {
-        ui_warn("Could not read file: %s", file_path);
+        logger_warn("Could not read file: %s", file_path);
         return -1;
     }
 
@@ -107,30 +107,66 @@ static int ingest_single_file(db_context_t *db, embedder_context_t *emb, const c
     return stored;
 }
 
-static int ingest_path_recursive(db_context_t *db, embedder_context_t *emb, const char *path,
-                                 int dim, int *total_docs, int *total_chunks)
+typedef struct {
+    char **paths;
+    size_t count;
+    size_t cap;
+} file_list_t;
+
+static void file_list_init(file_list_t *list)
+{
+    list->paths = NULL;
+    list->count = 0;
+    list->cap = 0;
+}
+
+static void file_list_add(file_list_t *list, const char *path)
+{
+    if (list->count >= list->cap) {
+        size_t ncap = list->cap == 0 ? 32 : list->cap * 2;
+        char **grown = (char **)realloc(list->paths, ncap * sizeof(char *));
+        if (!grown) {
+            return;
+        }
+        list->paths = grown;
+        list->cap = ncap;
+    }
+    char *p = strdup(path);
+    if (p) {
+        list->paths[list->count++] = p;
+    }
+}
+
+static void file_list_free(file_list_t *list)
+{
+    if (!list) {
+        return;
+    }
+    for (size_t i = 0; i < list->count; i++) {
+        free(list->paths[i]);
+    }
+    free(list->paths);
+    list->paths = NULL;
+    list->count = 0;
+    list->cap = 0;
+}
+
+static void collect_files_recursive(const char *path, file_list_t *list)
 {
     struct stat st;
     if (stat(path, &st) != 0) {
-        ui_error("Path does not exist: %s", path);
-        return -1;
+        return;
     }
 
     if (S_ISREG(st.st_mode)) {
-        int n_chunks = ingest_single_file(db, emb, path, dim);
-        if (n_chunks >= 0) {
-            (*total_docs)++;
-            (*total_chunks) += n_chunks;
-            ui_info("Ingested %s (%d chunks)", path, n_chunks);
-        }
-        return 0;
+        file_list_add(list, path);
+        return;
     }
 
     if (S_ISDIR(st.st_mode)) {
         DIR *dir = opendir(path);
         if (!dir) {
-            ui_error("Failed to open directory: %s", path);
-            return -1;
+            return;
         }
 
         const struct dirent *entry;
@@ -142,14 +178,60 @@ static int ingest_path_recursive(db_context_t *db, embedder_context_t *emb, cons
                 continue; /* skip hidden files/dirs */
             }
 
-            char subpath[1024];
+            char subpath[2048];
             snprintf(subpath, sizeof(subpath), "%s/%s", path, entry->d_name);
-            ingest_path_recursive(db, emb, subpath, dim, total_docs, total_chunks);
+            collect_files_recursive(subpath, list);
         }
         closedir(dir);
+    }
+}
+
+static void expand_user_path(const char *in, char *out, size_t out_sz)
+{
+    if (in[0] == '~' && (in[1] == '/' || in[1] == '\0')) {
+        const char *home = getenv("HOME");
+        if (home) {
+            snprintf(out, out_sz, "%s%s", home, in + 1);
+            return;
+        }
+    }
+    strncpy(out, in, out_sz - 1);
+    out[out_sz - 1] = '\0';
+}
+
+static int ingest_path(db_context_t *db, embedder_context_t *emb, const char *raw_path, int dim,
+                       int *total_docs, int *total_chunks)
+{
+    char path[2048];
+    expand_user_path(raw_path, path, sizeof(path));
+
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        ui_error("Path does not exist: %s", raw_path);
+        return -1;
+    }
+
+    file_list_t files;
+    file_list_init(&files);
+    collect_files_recursive(path, &files);
+
+    if (files.count == 0) {
+        ui_warn("No regular files found to ingest in: %s", raw_path);
+        file_list_free(&files);
         return 0;
     }
 
+    for (size_t i = 0; i < files.count; i++) {
+        ui_ingest_progress(i + 1, files.count, files.paths[i]);
+        int n_chunks = ingest_single_file(db, emb, files.paths[i], dim);
+        if (n_chunks >= 0) {
+            (*total_docs)++;
+            (*total_chunks) += n_chunks;
+        }
+    }
+
+    ui_clear_status();
+    file_list_free(&files);
     return 0;
 }
 
@@ -252,7 +334,7 @@ static int run_ingest_mode(const librarian_config_t *cfg, const char *path)
     ui_info("Ingesting path: %s", path);
     double t_start = get_time_sec();
     int docs = 0, chunks = 0;
-    ingest_path_recursive(db, emb, path, cfg->embed_dimension, &docs, &chunks);
+    ingest_path(db, emb, path, cfg->embed_dimension, &docs, &chunks);
     double t_end = get_time_sec();
 
     ui_success("Ingestion complete: %d documents, %d total chunks stored (⏱ %.2fs)", docs, chunks,
@@ -494,7 +576,7 @@ static int run_chat_mode(const librarian_config_t *cfg)
                 ui_info("Ingesting: %s", target);
                 double t0 = get_time_sec();
                 int docs = 0, chunks = 0;
-                ingest_path_recursive(db, emb, target, cfg->embed_dimension, &docs, &chunks);
+                ingest_path(db, emb, target, cfg->embed_dimension, &docs, &chunks);
                 double t1 = get_time_sec();
                 ui_success("Ingested %d documents, %d total chunks (⏱ %.2fs)", docs, chunks,
                            t1 - t0);

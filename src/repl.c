@@ -552,7 +552,8 @@ static size_t render_completion_menu(const candidate_list_t *list, size_t select
 
             if (idx == selected) {
                 /* Selected: Vibrant purple pill highlight */
-                printf("\x1b[38;2;18;18;24;48;2;189;147;249;1m %-*s \x1b[0m", (int)(cellw - 2), disp);
+                printf("\x1b[38;2;18;18;24;48;2;189;147;249;1m %-*s \x1b[0m", (int)(cellw - 2),
+                       disp);
             } else {
                 /* Unselected: clean gray text (with cyan accent for directories) */
                 if (is_dir) {

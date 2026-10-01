@@ -11,6 +11,7 @@ const char *test_ui_badges(void)
     ui_banner();
     ui_prompt();
     ui_status("[testing...]");
+    ui_ingest_progress(5, 10, "/home/test/sample.txt");
     ui_clear_status();
     ui_confidence_badge(0.85f, false);
     ui_confidence_badge(0.35f, true);

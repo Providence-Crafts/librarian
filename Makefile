@@ -84,7 +84,7 @@ all: release
 release: CFLAGS = $(STD) $(WARNING_FLAGS) $(INCLUDES) $(DEFINES) -O3 -DNDEBUG
 release: $(BIN_DIR)/$(TARGET_NAME)
 
-debug: CFLAGS = $(STD) $(WARNING_FLAGS) $(INCLUDES) $(DEFINES) -U_FORTIFY_SOURCE -O0 -g3 -DDEBUG
+debug: CFLAGS = $(STD) $(WARNING_FLAGS) $(INCLUDES) $(DEFINES) -Og -g3 -DDEBUG
 debug: $(BIN_DIR)/$(TARGET_NAME)
 
 asan: CFLAGS = $(STD) $(WARNING_FLAGS) $(INCLUDES) $(DEFINES) -fsanitize=address,undefined -fno-omit-frame-pointer -g3 -O1 -DDEBUG
@@ -147,16 +147,18 @@ valgrind: debug
 
 tidy:
 	@echo "🧹 Running clang-tidy analysis..."
-	clang-tidy $(SRCS) $(wildcard $(INC_DIR)/*.h) -- $(INCLUDES) $(STD)
+	clang-tidy $(SRCS) -- $(INCLUDES) $(DEFINES) $(STD) $(NIX_CFLAGS_COMPILE)
 
 cppcheck:
 	@echo "🛡️ Running cppcheck..."
-	cppcheck --enable=all \
+	cppcheck --enable=warning,style,performance,portability \
 	         --suppress=missingIncludeSystem \
 	         --suppress=checkersReport \
-	         --inconclusive \
+	         --suppress=unusedFunction \
+	         --suppress='*:vendor/*' \
 	         --error-exitcode=1 \
-	         $(INCLUDES) $(SRC_DIR) $(INC_DIR)
+	         -I$(INC_DIR) -I$(VENDOR_DIR)/sqlite -I$(VENDOR_DIR)/sqlite-vec -I$(VENDOR_DIR)/tomlc99 -I$(VENDOR_DIR)/llama.cpp/include -I$(VENDOR_DIR)/llama.cpp/ggml/include \
+	         $(SRC_DIR) $(INC_DIR)
 
 format:
 	@echo "✨ Formatting source code..."

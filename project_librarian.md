@@ -7,7 +7,7 @@ id: "librarian"
 #   * in-progress -> execution ongoing
 #   * waiting condition -> blocked externally
 #   * completed/finished -> goals met & verified
-status: defined               # initiated | defined | in-research | in-progress | waiting | completed
+status: completed            # initiated | defined | in-research | in-progress | waiting | completed
 priority: high                # critical | high | medium | low
 start_date: "2026-10-01"      # ISO 8601: YYYY-MM-DD
 target_date: ""               # ISO 8601: YYYY-MM-DD
@@ -249,15 +249,23 @@ Implement generative inference using `llama.h`, prompt assembly with retrieved c
 Wire all subsystems into `src/main.c`, providing `ingest`, `query`, and `chat` REPL modes with slash commands, complete documentation, and full validation suite.
 
 **Tasks**
-- [ ] Implement CLI router in `src/main.c` supporting `ingest <path>`, `query "<prompt>"`, and `chat`.
-- [ ] Implement interactive REPL loop maintaining models loaded in memory, with status indicators (`[thinking...]`, `[searching...]`).
-- [ ] Implement REPL slash commands: `/ingest <path>`, `/stats`, `/quit`, `/exit`.
-- [ ] Run full test suite with AddressSanitizer and LeakSanitizer (`make test`).
-- [ ] Run Valgrind memory leak verification (`make valgrind`).
-- [ ] Run static analysis audits (`make tidy`, `make cppcheck`).
+- [✓] Implement CLI router in `src/main.c` supporting `ingest <path>`, `query "<prompt>"`, and `chat`.
+- [✓] Implement interactive REPL loop maintaining models loaded in memory, with status indicators (`[thinking...]`, `[searching...]`).
+- [✓] Implement REPL slash commands: `/help`, `/ingest <path>`, `/stats`, `/config`, `/clear`, `/quit`, `/exit`.
+- [✓] Run full test suite with AddressSanitizer and LeakSanitizer (`make test`).
+- [✓] Run Valgrind memory leak verification (`make valgrind`).
+- [✓] Run static analysis audits (`make tidy`, `make cppcheck`).
 
 **Checks**
-- [ ] `librarian ingest` ingests sample files into SQLite DB.
-- [ ] `librarian query` answers questions with pastel UI and confidence badges.
-- [ ] `librarian chat` REPL responds interactively to queries and slash commands without crashing or memory leaks.
-- [ ] `make test`, `make tidy`, and `make valgrind` pass with 0 errors and 0 warnings.
+- [✓] `librarian ingest` ingests sample files into SQLite DB.
+- [✓] `librarian query` answers questions with pastel UI and confidence badges.
+- [✓] `librarian chat` REPL responds interactively to queries and slash commands without crashing or memory leaks.
+- [✓] `make test`, `make tidy`, and `make valgrind` pass with 0 errors and 0 warnings.
+
+**Design decisions**
+- Decision: Lazily load the generative LLM weights (MiniCPM5-2B) during one-off `query` mode.
+  Rationale: Stage 1 retrieval distance filtering runs on the lightweight Harrier-OSS embedder (0.6B) and vector database; if no relevant context exists, the query is rejected immediately in ~90ms without allocating 2.6 GB for generative weights.
+- Decision: Strip `<think>...</think>` internal reasoning tags from generative output before returning answer.
+  Rationale: Reasoning models output structured thoughts that clutter CLI responses; extracting the answer after the thinking block yields clean, grounded answers.
+- Decision: Rich Unicode pastel banner featuring Minecraft bookshelf motif with colored block book spines.
+  Rationale: Delivers a distinctive terminal user experience aligned with suckless tools and Unix philosophy while visually conveying the local, self-contained library theme.

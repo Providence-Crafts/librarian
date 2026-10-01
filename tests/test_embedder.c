@@ -1,9 +1,10 @@
-#include "minunit.h"
 #include "embedder.h"
+#include "minunit.h"
+
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 const char *test_chunking_logic(void);
 const char *test_vector_normalization(void);
@@ -11,11 +12,10 @@ const char *test_embedder_model(void);
 
 const char *test_chunking_logic(void)
 {
-    const char *sample =
-        "The quick brown fox jumps over the lazy dog. "
-        "Pack my box with five dozen liquor jugs. "
-        "How vexingly quick daft zebras jump! "
-        "Bright vixens jump; dozy fowl quack.";
+    const char *sample = "The quick brown fox jumps over the lazy dog. "
+                         "Pack my box with five dozen liquor jugs. "
+                         "How vexingly quick daft zebras jump! "
+                         "Bright vixens jump; dozy fowl quack.";
 
     /* 8 words per chunk, 2 words overlap */
     chunk_list_t list = chunk_text(sample, 8, 2);
@@ -47,7 +47,7 @@ const char *test_vector_normalization(void)
     mu_assert("norm y component should be 0.8", fabsf(vec[1] - 0.8f) < 1e-5f);
     mu_assert("norm z component should be 0.0", fabsf(vec[2] - 0.0f) < 1e-5f);
 
-    float norm_sq = vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2];
+    float norm_sq = vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2];
     mu_assert("norm should equal 1.0", fabsf(norm_sq - 1.0f) < 1e-5f);
 
     return NULL;

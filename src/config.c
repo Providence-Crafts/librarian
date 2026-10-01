@@ -1,17 +1,21 @@
 #include "config.h"
+
 #include "toml.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 void config_default(librarian_config_t *cfg)
 {
-    if (!cfg) return;
+    if (!cfg)
+        return;
     memset(cfg, 0, sizeof(*cfg));
 
     snprintf(cfg->db_path, sizeof(cfg->db_path), "data/librarian.db");
 
-    snprintf(cfg->embed_model_path, sizeof(cfg->embed_model_path), "models/harrier-oss-v1-0.6b.Q8_0.gguf");
+    snprintf(cfg->embed_model_path, sizeof(cfg->embed_model_path),
+             "models/harrier-oss-v1-0.6b.Q8_0.gguf");
     cfg->embed_dimension = 1024;
     cfg->similarity_threshold = 0.65f;
 
@@ -39,7 +43,7 @@ int config_load(const char *path, librarian_config_t *cfg)
     }
 
     /* [database] */
-    toml_table_t *tab_db = toml_table_in(root, "database");
+    const toml_table_t *tab_db = toml_table_in(root, "database");
     if (tab_db) {
         toml_datum_t d_path = toml_string_in(tab_db, "path");
         if (d_path.ok) {
@@ -50,7 +54,7 @@ int config_load(const char *path, librarian_config_t *cfg)
     }
 
     /* [embedder] */
-    toml_table_t *tab_emb = toml_table_in(root, "embedder");
+    const toml_table_t *tab_emb = toml_table_in(root, "embedder");
     if (tab_emb) {
         toml_datum_t d_path = toml_string_in(tab_emb, "model_path");
         if (d_path.ok) {
@@ -69,7 +73,7 @@ int config_load(const char *path, librarian_config_t *cfg)
     }
 
     /* [generator] */
-    toml_table_t *tab_gen = toml_table_in(root, "generator");
+    const toml_table_t *tab_gen = toml_table_in(root, "generator");
     if (tab_gen) {
         toml_datum_t d_path = toml_string_in(tab_gen, "model_path");
         if (d_path.ok) {
@@ -93,11 +97,12 @@ int config_load(const char *path, librarian_config_t *cfg)
 
 void config_print(const librarian_config_t *cfg)
 {
-    if (!cfg) return;
+    if (!cfg)
+        return;
     printf("Configuration:\n");
     printf("  [database] path = %s\n", cfg->db_path);
-    printf("  [embedder] model = %s (dim=%d, sim_thresh=%.2f)\n",
-           cfg->embed_model_path, cfg->embed_dimension, (double)cfg->similarity_threshold);
-    printf("  [generator] model = %s (ctx=%d, conf_thresh=%.2f)\n",
-           cfg->gen_model_path, cfg->gen_context_length, (double)cfg->confidence_threshold);
+    printf("  [embedder] model = %s (dim=%d, sim_thresh=%.2f)\n", cfg->embed_model_path,
+           cfg->embed_dimension, (double)cfg->similarity_threshold);
+    printf("  [generator] model = %s (ctx=%d, conf_thresh=%.2f)\n", cfg->gen_model_path,
+           cfg->gen_context_length, (double)cfg->confidence_threshold);
 }

@@ -1,10 +1,12 @@
 #include "embedder.h"
+
 #include "llama.h"
+
+#include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-#include <math.h>
 
 struct embedder_context {
     struct llama_model *model;
@@ -14,7 +16,8 @@ struct embedder_context {
 
 void vector_normalize_l2(float *vec, int dim)
 {
-    if (!vec || dim <= 0) return;
+    if (!vec || dim <= 0)
+        return;
     double sum = 0.0;
     for (int i = 0; i < dim; i++) {
         sum += (double)vec[i] * (double)vec[i];
@@ -33,16 +36,20 @@ chunk_list_t chunk_text(const char *text, int chunk_size_words, int overlap_word
     list.chunks = NULL;
     list.count = 0;
 
-    if (!text || chunk_size_words <= 0) return list;
-    if (overlap_words < 0) overlap_words = 0;
-    if (overlap_words >= chunk_size_words) overlap_words = chunk_size_words - 1;
+    if (!text || chunk_size_words <= 0)
+        return list;
+    if (overlap_words < 0)
+        overlap_words = 0;
+    if (overlap_words >= chunk_size_words)
+        overlap_words = chunk_size_words - 1;
 
     /* First pass: count words and record offsets */
     size_t len = strlen(text);
-    if (len == 0) return list;
+    if (len == 0)
+        return list;
 
     int max_words = 16384;
-    const char **word_starts = malloc(sizeof(char*) * (size_t)max_words);
+    const char **word_starts = malloc(sizeof(char *) * (size_t)max_words);
     size_t *word_lens = malloc(sizeof(size_t) * (size_t)max_words);
     if (!word_starts || !word_lens) {
         free(word_starts);
@@ -53,18 +60,22 @@ chunk_list_t chunk_text(const char *text, int chunk_size_words, int overlap_word
     int word_count = 0;
     size_t idx = 0;
     while (idx < len) {
-        while (idx < len && isspace((unsigned char)text[idx])) idx++;
-        if (idx >= len) break;
+        while (idx < len && isspace((unsigned char)text[idx]))
+            idx++;
+        if (idx >= len)
+            break;
 
         size_t start = idx;
-        while (idx < len && !isspace((unsigned char)text[idx])) idx++;
+        while (idx < len && !isspace((unsigned char)text[idx]))
+            idx++;
         size_t wlen = idx - start;
 
         if (word_count >= max_words) {
             max_words *= 2;
-            const char **wstarts_new = realloc(word_starts, sizeof(char*) * (size_t)max_words);
+            const char **wstarts_new = realloc(word_starts, sizeof(char *) * (size_t)max_words);
             size_t *wlens_new = realloc(word_lens, sizeof(size_t) * (size_t)max_words);
-            if (!wstarts_new || !wlens_new) break;
+            if (!wstarts_new || !wlens_new)
+                break;
             word_starts = wstarts_new;
             word_lens = wlens_new;
         }
@@ -82,10 +93,11 @@ chunk_list_t chunk_text(const char *text, int chunk_size_words, int overlap_word
 
     /* Compute chunks */
     int step = chunk_size_words - overlap_words;
-    if (step <= 0) step = 1;
+    if (step <= 0)
+        step = 1;
 
     int chunk_cap = (word_count / step) + 2;
-    list.chunks = malloc(sizeof(char*) * (size_t)chunk_cap);
+    list.chunks = malloc(sizeof(char *) * (size_t)chunk_cap);
     if (!list.chunks) {
         free(word_starts);
         free(word_lens);
@@ -105,18 +117,21 @@ chunk_list_t chunk_text(const char *text, int chunk_size_words, int overlap_word
         }
 
         char *chunk_str = malloc(buf_sz + 1);
-        if (!chunk_str) break;
+        if (!chunk_str)
+            break;
 
         size_t pos = 0;
         for (int i = 0; i < count_in_chunk; i++) {
-            if (i > 0) chunk_str[pos++] = ' ';
+            if (i > 0)
+                chunk_str[pos++] = ' ';
             memcpy(chunk_str + pos, word_starts[w + i], word_lens[w + i]);
             pos += word_lens[w + i];
         }
         chunk_str[pos] = '\0';
 
         list.chunks[list.count++] = chunk_str;
-        if (w + count_in_chunk >= word_count) break;
+        if (w + count_in_chunk >= word_count)
+            break;
     }
 
     free(word_starts);
@@ -126,7 +141,8 @@ chunk_list_t chunk_text(const char *text, int chunk_size_words, int overlap_word
 
 void chunk_list_free(chunk_list_t *list)
 {
-    if (!list || !list->chunks) return;
+    if (!list || !list->chunks)
+        return;
     for (int i = 0; i < list->count; i++) {
         free(list->chunks[i]);
     }
@@ -137,7 +153,8 @@ void chunk_list_free(chunk_list_t *list)
 
 embedder_context_t *embedder_init(const char *model_path, int dimension)
 {
-    if (!model_path) return NULL;
+    if (!model_path)
+        return NULL;
 
     llama_backend_init();
 
@@ -178,7 +195,8 @@ embedder_context_t *embedder_init(const char *model_path, int dimension)
 
 void embedder_free(embedder_context_t *ctx)
 {
-    if (!ctx) return;
+    if (!ctx)
+        return;
     if (ctx->ctx) {
         llama_free(ctx->ctx);
     }
@@ -190,15 +208,18 @@ void embedder_free(embedder_context_t *ctx)
 
 int embedder_embed(embedder_context_t *ctx, const char *text, float *out_vec)
 {
-    if (!ctx || !ctx->ctx || !ctx->model || !text || !out_vec) return -1;
+    if (!ctx || !ctx->ctx || !ctx->model || !text || !out_vec)
+        return -1;
 
     const struct llama_vocab *vocab = llama_model_get_vocab(ctx->model);
     int text_len = (int)strlen(text);
     int n_tokens_alloc = text_len + 16;
-    if (n_tokens_alloc < 64) n_tokens_alloc = 64;
+    if (n_tokens_alloc < 64)
+        n_tokens_alloc = 64;
 
     llama_token *tokens = malloc(sizeof(llama_token) * (size_t)n_tokens_alloc);
-    if (!tokens) return -1;
+    if (!tokens)
+        return -1;
 
     int n_tokens = llama_tokenize(vocab, text, text_len, tokens, n_tokens_alloc, true, true);
     if (n_tokens < 0) {
@@ -231,7 +252,7 @@ int embedder_embed(embedder_context_t *ctx, const char *text, float *out_vec)
         batch.pos[i] = i;
         batch.n_seq_id[i] = 1;
         batch.seq_id[i][0] = 0;
-        batch.logits[i] = (i == n_tokens - 1);
+        batch.logits[i] = true;
     }
     batch.n_tokens = n_tokens;
 

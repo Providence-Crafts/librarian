@@ -1,10 +1,11 @@
-#include "minunit.h"
 #include "db.h"
+#include "minunit.h"
+
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <math.h>
 
 const char *test_db_lifecycle_and_knn(void);
 
@@ -57,14 +58,11 @@ const char *test_db_lifecycle_and_knn(void)
     mu_assert("results should not be null", results != NULL);
 
     /* Top result should be chunk 1 (apples) */
-    mu_assert("top result should be apples",
-              strstr(results[0].content, "apples") != NULL);
-    mu_assert("top result similarity should be > 0.9",
-              results[0].similarity > 0.9f);
+    mu_assert("top result should be apples", strstr(results[0].content, "apples") != NULL);
+    mu_assert("top result similarity should be > 0.9", results[0].similarity > 0.9f);
 
     /* Second result should be chunk 2 (bananas) */
-    mu_assert("second result should be bananas",
-              strstr(results[1].content, "bananas") != NULL);
+    mu_assert("second result should be bananas", strstr(results[1].content, "bananas") != NULL);
     mu_assert("second result similarity should be lower than top",
               results[1].similarity < results[0].similarity);
 

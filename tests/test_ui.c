@@ -1,5 +1,6 @@
 #include "minunit.h"
 #include "ui.h"
+
 #include <string.h>
 
 const char *test_ui_badges(void);

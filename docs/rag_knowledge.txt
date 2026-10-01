@@ -1,0 +1,10 @@
+# Librarian Knowledge Base
+
+Librarian is a self-contained, embedded Retrieval-Augmented Generation (RAG) system written in pure ISO C99.
+It uses sqlite-vec for high-performance in-process vector similarity search with cosine distance metrics.
+The embedding model is Harrier-OSS 0.6B running locally via llama.cpp, producing 1024-dimensional normalized vectors.
+The generative model is MiniCPM5-2B quantized to Q8_0, running fully on the local CPU without cloud telemetry.
+Librarian features a two-stage hallucination refusal engine:
+1. Stage 1 Retrieval Refusal: Rejects queries when vector cosine similarity is below the configured threshold (default 0.65).
+2. Stage 2 Generation Refusal: Rejects queries when mean sequence token logprob confidence is below the threshold (default 0.40) or when the model generates [INSUFFICIENT_DATA].
+Librarian is designed with a pastel terminal interface inspired by suckless tools and the Minecraft bookshelf aesthetic.

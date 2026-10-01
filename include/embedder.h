@@ -1,8 +1,8 @@
 #ifndef LIBRARIAN_EMBEDDER_H
 #define LIBRARIAN_EMBEDDER_H
 
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 typedef struct {
     char **chunks;

@@ -1,6 +1,7 @@
-#include "minunit.h"
-#include "generator.h"
 #include "db.h"
+#include "generator.h"
+#include "minunit.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,7 +12,8 @@ const char *test_generator_model_inference(void);
 const char *test_generator_stage1_refusal(void)
 {
     /* Test 1: Empty retrieval -> immediate Stage 1 refusal */
-    generation_result_t res1 = generator_generate(NULL, "What is the secret formula?", NULL, 0, 0.65f, 0.50f);
+    generation_result_t res1 =
+        generator_generate(NULL, "What is the secret formula?", NULL, 0, 0.65f, 0.50f);
     mu_assert("res1 should be refusal", res1.is_refusal);
     mu_assert("res1 reason should mention Stage 1", strstr(res1.refusal_reason, "Stage 1") != NULL);
     mu_assert("res1 text should not be null", res1.text != NULL);
@@ -26,7 +28,8 @@ const char *test_generator_stage1_refusal(void)
     mock_results[0].distance = 0.58f;
     mock_results[0].similarity = 0.42f;
 
-    generation_result_t res2 = generator_generate(NULL, "What is quantum gravity?", mock_results, 1, 0.65f, 0.50f);
+    generation_result_t res2 =
+        generator_generate(NULL, "What is quantum gravity?", mock_results, 1, 0.65f, 0.50f);
     mu_assert("res2 should be refusal", res2.is_refusal);
     mu_assert("res2 reason should mention Stage 1", strstr(res2.refusal_reason, "Stage 1") != NULL);
     mu_assert("res2 confidence should match top similarity", res2.confidence == 0.42f);
@@ -56,7 +59,8 @@ const char *test_generator_model_inference(void)
     mock[0].distance = 0.15f;
     mock[0].similarity = 0.85f;
 
-    generation_result_t res = generator_generate(gen, "What did C99 introduce?", mock, 1, 0.65f, 0.50f);
+    generation_result_t res =
+        generator_generate(gen, "What did C99 introduce?", mock, 1, 0.65f, 0.50f);
     mu_assert("res should not be null", res.text != NULL);
     mu_assert("res confidence should be > 0.0", res.confidence > 0.0f);
 

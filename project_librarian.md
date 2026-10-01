@@ -7,10 +7,10 @@ id: "librarian"
 #   * in-progress -> execution ongoing
 #   * waiting condition -> blocked externally
 #   * completed/finished -> goals met & verified
-status: completed            # initiated | defined | in-research | in-progress | waiting | completed
+status: completed          # initiated | defined | in-research | in-progress | waiting | completed
 priority: high                # critical | high | medium | low
 start_date: "2026-10-01"      # ISO 8601: YYYY-MM-DD
-target_date: ""               # ISO 8601: YYYY-MM-DD
+target_date: "2026-10-01"     # ISO 8601: YYYY-MM-DD
 last_updated: "2026-10-01"    # ISO 8601: YYYY-MM-DD
 owner: "rs"                   # primary responsible person
 stakeholders: []              # list of names or handles
@@ -269,3 +269,34 @@ Wire all subsystems into `src/main.c`, providing `ingest`, `query`, and `chat` R
   Rationale: Reasoning models output structured thoughts that clutter CLI responses; extracting the answer after the thinking block yields clean, grounded answers.
 - Decision: Rich Unicode pastel banner featuring Minecraft bookshelf motif with colored block book spines.
   Rationale: Delivers a distinctive terminal user experience aligned with suckless tools and Unix philosophy while visually conveying the local, self-contained library theme.
+
+---
+
+### Phase 7: Advanced Interactive REPL & Logging Subsystem
+
+**Description**
+Implement a full POSIX-termios line editor and tab completion engine inspired by `../sqlsh/`, supporting left/right cursor navigation, persistent history browsing with up/down arrows, and an interactive tab-completion menu for slash commands and filesystem paths. Redirect all internal llama.cpp and ggml logs to a dedicated log file to keep the user interface clean and pastel.
+
+**Tasks**
+- [✓] Define logging subsystem in `include/logger.h` and `src/logger.c` intercepting `llama_log_set` and `ggml_log_set` into `data/librarian.log`.
+- [✓] Implement line editing core with termios raw mode in `src/repl.c` and `include/repl.h`.
+- [✓] Implement cursor navigation (Left/Right arrows, Home, End, Backspace, Delete).
+- [✓] Implement command history buffer with navigation (Up/Down arrows) and disk persistence (`data/history.txt` / `$XDG_STATE_HOME`).
+- [✓] Implement tab autocompletion candidate generator for slash commands (`/help`, `/ingest`, `/stats`, `/config`, `/clear`, `/exit`, `/quit`) and filesystem paths for `/ingest <path>`.
+- [✓] Implement interactive completion menu rendered below prompt with arrow / tab selection and Return acceptance.
+- [✓] Integrate advanced REPL into `src/main.c` `run_chat_mode`, retaining clean non-interactive fallback for non-TTY streams.
+- [✓] Verify AddressSanitizer, UBSan, Valgrind, and static analysis on the enhanced REPL and logging subsystems.
+
+**Checks**
+- [✓] Left and right arrows move cursor within the typed line without visual glitches.
+- [✓] Up and down arrows navigate through previous query history.
+- [✓] Pressing Tab opens candidate options, navigable with Tab or arrows, and selectable with Return.
+- [✓] Terminal remains free of llama.cpp graph/tensor log output; logs are placed into log file.
+- [✓] Unit tests, `make test`, `make tidy`, `make cppcheck`, and `make valgrind` pass with 0 errors and 0 warnings.
+
+**Design decisions**
+- Decision: Use POSIX termios with signal restoration handlers for raw mode line editing.
+  Rationale: Matches `sqlsh` design, giving full control over arrow keys, cursor movements, and custom tab completion without heavy external dependencies like readline.
+- Decision: Redirect llama.cpp/ggml logs via `llama_log_set` callback to `data/librarian.log`.
+  Rationale: Completely isolates internal backend diagnostics from the user-facing pastel UI while preserving detailed execution logs for auditing and debugging.
+

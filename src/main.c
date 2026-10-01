@@ -2,6 +2,8 @@
 #include "db.h"
 #include "embedder.h"
 #include "generator.h"
+#include "logger.h"
+#include "repl.h"
 #include "ui.h"
 
 #include <ctype.h>
@@ -427,20 +429,19 @@ static int run_chat_mode(const librarian_config_t *cfg)
     printf(COLOR_GRAY "Type /help for commands, or type your question directly.\n" COLOR_RESET
                       "\n");
 
-    char line[4096];
+    /* Initialize interactive REPL with persistent history */
+    char hist_path[512];
+    snprintf(hist_path, sizeof(hist_path), "data/history.txt");
+    repl_context_t *repl = repl_init(hist_path);
+
+    const char *prompt_str = COLOR_LAVENDER COLOR_BOLD "📚 librarian" COLOR_MINT " ❯ " COLOR_RESET;
+
     while (1) {
-        ui_prompt();
-        if (!fgets(line, sizeof(line), stdin)) {
+        char *line = repl_readline(repl, prompt_str);
+        if (!line) {
             printf("\n");
             ui_info("Session ended. Goodbye!");
             break;
-        }
-
-        /* Trim trailing newline and spaces */
-        size_t len = strlen(line);
-        while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r' ||
-                           isspace((unsigned char)line[len - 1]))) {
-            line[--len] = '\0';
         }
 
         /* Skip leading whitespace */
@@ -449,6 +450,9 @@ static int run_chat_mode(const librarian_config_t *cfg)
             cmd++;
         if (*cmd == '\0')
             continue;
+
+        /* Add to history */
+        repl_history_add(repl, cmd);
 
         if (strcmp(cmd, "/exit") == 0 || strcmp(cmd, "/quit") == 0 || strcmp(cmd, "/q") == 0) {
             ui_info("Shutting down Librarian. Goodbye!");
@@ -509,6 +513,7 @@ static int run_chat_mode(const librarian_config_t *cfg)
         run_query_core(db, emb, gen, cfg, cmd);
     }
 
+    repl_free(repl);
     generator_free(gen);
     embedder_free(emb);
     db_close(db);
@@ -553,26 +558,33 @@ int main(int argc, char **argv)
         ui_warn("Could not load %s; using default configuration", CONFIG_DEFAULT_PATH);
     }
 
+    /* Initialize logger to redirect llama.cpp/ggml output to log file */
+    if (logger_init(cfg.log_path) != 0) {
+        ui_warn("Could not open log file %s", cfg.log_path);
+    }
+
+    int rc = 0;
     if (strcmp(argv[1], "ingest") == 0) {
         if (argc < 3) {
             ui_error("Missing path to ingest. Usage: %s ingest <file_or_dir>", argv[0]);
+            logger_close();
             return 1;
         }
-        return run_ingest_mode(&cfg, argv[2]);
-    }
-
-    if (strcmp(argv[1], "query") == 0) {
+        rc = run_ingest_mode(&cfg, argv[2]);
+    } else if (strcmp(argv[1], "query") == 0) {
         if (argc < 3) {
             ui_error("Missing query string. Usage: %s query \"<question>\"", argv[0]);
+            logger_close();
             return 1;
         }
-        return run_query_mode(&cfg, argv[2]);
+        rc = run_query_mode(&cfg, argv[2]);
+    } else if (strcmp(argv[1], "chat") == 0) {
+        rc = run_chat_mode(&cfg);
+    } else {
+        ui_error("Unknown command '%s'. Run '%s --help' for usage.", argv[1], argv[0]);
+        rc = 1;
     }
 
-    if (strcmp(argv[1], "chat") == 0) {
-        return run_chat_mode(&cfg);
-    }
-
-    ui_error("Unknown command '%s'. Run '%s --help' for usage.", argv[1], argv[0]);
-    return 1;
+    logger_close();
+    return rc;
 }

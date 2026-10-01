@@ -13,6 +13,7 @@ void config_default(librarian_config_t *cfg)
     memset(cfg, 0, sizeof(*cfg));
 
     snprintf(cfg->db_path, sizeof(cfg->db_path), "data/librarian.db");
+    snprintf(cfg->log_path, sizeof(cfg->log_path), "data/librarian.log");
 
     snprintf(cfg->embed_model_path, sizeof(cfg->embed_model_path),
              "models/harrier-oss-v1-0.6b.Q8_0.gguf");
@@ -91,6 +92,23 @@ int config_load(const char *path, librarian_config_t *cfg)
         }
     }
 
+    /* [logging] or [system] */
+    const toml_table_t *tab_log = toml_table_in(root, "logging");
+    if (!tab_log) {
+        tab_log = toml_table_in(root, "system");
+    }
+    if (tab_log) {
+        toml_datum_t d_log = toml_string_in(tab_log, "log_path");
+        if (!d_log.ok) {
+            d_log = toml_string_in(tab_log, "path");
+        }
+        if (d_log.ok) {
+            strncpy(cfg->log_path, d_log.u.s, sizeof(cfg->log_path) - 1);
+            cfg->log_path[sizeof(cfg->log_path) - 1] = '\0';
+            free(d_log.u.s);
+        }
+    }
+
     toml_free(root);
     return 0;
 }
@@ -101,6 +119,7 @@ void config_print(const librarian_config_t *cfg)
         return;
     printf("Configuration:\n");
     printf("  [database] path = %s\n", cfg->db_path);
+    printf("  [logging] path = %s\n", cfg->log_path);
     printf("  [embedder] model = %s (dim=%d, sim_thresh=%.2f)\n", cfg->embed_model_path,
            cfg->embed_dimension, (double)cfg->similarity_threshold);
     printf("  [generator] model = %s (ctx=%d, conf_thresh=%.2f)\n", cfg->gen_model_path,

@@ -67,8 +67,8 @@ TEST_OBJS = $(patsubst $(TEST_DIR)/%.c, $(BUILD_DIR)/tests/%.o, $(TEST_SRCS))
 DEFINES = -D_GNU_SOURCE -DSQLITE_CORE=1 -DSQLITE_VEC_STATIC=1
 
 # Base flags
-CFLAGS ?= $(STD) $(WARNING_FLAGS) $(INCLUDES) $(DEFINES) -O3 -DNDEBUG -march=native
-LDFLAGS ?=
+CFLAGS := $(STD) $(WARNING_FLAGS) $(INCLUDES) $(DEFINES) -O3 -DNDEBUG -march=native
+LDFLAGS :=
 
 # Vendor compile flags (relaxed warnings for 3rd-party code)
 VENDOR_CFLAGS = -std=c99 -O3 -isystem $(VENDOR_DIR)/sqlite -isystem $(VENDOR_DIR)/sqlite-vec -isystem $(VENDOR_DIR)/tomlc99 -DSQLITE_THREADSAFE=1 -DSQLITE_ENABLE_NORMALIZE -DSQLITE_ENABLE_FTS5 $(DEFINES)
@@ -120,15 +120,15 @@ $(BUILD_DIR)/vendor/toml.o: $(VENDOR_DIR)/tomlc99/toml.c | $(BUILD_DIR)/vendor
 # Test Suite Target
 # ------------------------------------------------------------------------------
 
-test: CFLAGS = $(STD) $(WARNING_FLAGS) $(INCLUDES) $(DEFINES) -fsanitize=address,undefined -fno-omit-frame-pointer -g3 -O1 -DDEBUG
-test: LDFLAGS += -fsanitize=address,undefined
 test: $(BUILD_DIR)/tests/test_runner
 	@echo "\n🧪 Running test suite..."
 	@ASAN_OPTIONS="detect_leaks=1:abort_on_error=1" ./$(BUILD_DIR)/tests/test_runner
 
+$(BUILD_DIR)/tests/test_runner: LDFLAGS += -fsanitize=address,undefined
 $(BUILD_DIR)/tests/test_runner: $(filter-out $(BUILD_DIR)/main.o, $(OBJS)) $(TEST_OBJS) $(VENDOR_OBJS) $(LLAMA_LIBS) | $(BUILD_DIR)/tests
-	$(CC) $^ -o $@ $(LDFLAGS) $(SYS_LIBS)
+	$(CC) $(filter-out $(BUILD_DIR)/main.o, $(OBJS)) $(TEST_OBJS) $(VENDOR_OBJS) $(LLAMA_LIBS) -o $@ $(LDFLAGS) $(SYS_LIBS)
 
+$(BUILD_DIR)/tests/%.o: CFLAGS = $(STD) $(WARNING_FLAGS) $(INCLUDES) $(DEFINES) -fsanitize=address,undefined -fno-omit-frame-pointer -g3 -O1 -DDEBUG
 $(BUILD_DIR)/tests/%.o: $(TEST_DIR)/%.c | $(BUILD_DIR)/tests
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 

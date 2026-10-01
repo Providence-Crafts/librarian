@@ -20,11 +20,12 @@ const char *test_generator_stage1_refusal(void)
     generation_result_free(&res1);
 
     /* Test 2: Low similarity (0.42 < 0.65) -> immediate Stage 1 refusal */
+    char content1[] = "Apples are delicious red or green fruits.";
     search_result_t mock_results[1];
     mock_results[0].chunk_id = 1;
     mock_results[0].doc_id = 1;
     strncpy(mock_results[0].doc_path, "docs/apples.txt", sizeof(mock_results[0].doc_path));
-    mock_results[0].content = "Apples are delicious red or green fruits.";
+    mock_results[0].content = content1;
     mock_results[0].distance = 0.58f;
     mock_results[0].similarity = 0.42f;
 
@@ -51,11 +52,12 @@ const char *test_generator_model_inference(void)
     generator_context_t *gen = generator_init(model_path, 2048);
     mu_assert("generator_init failed", gen != NULL);
 
+    char content2[] = "The C99 standard introduced line comments starting with double slashes.";
     search_result_t mock[1];
     mock[0].chunk_id = 1;
     mock[0].doc_id = 1;
     strncpy(mock[0].doc_path, "docs/c99.txt", sizeof(mock[0].doc_path));
-    mock[0].content = "The C99 standard introduced line comments starting with double slashes.";
+    mock[0].content = content2;
     mock[0].distance = 0.15f;
     mock[0].similarity = 0.85f;
 

@@ -7,6 +7,7 @@
 
 typedef struct {
     char db_path[512];
+    char log_path[512];
 
     /* Embedder settings */
     char embed_model_path[512];

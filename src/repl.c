@@ -551,18 +551,14 @@ static size_t render_completion_menu(const candidate_list_t *list, size_t select
             bool is_dir = list->items[idx].is_dir;
 
             if (idx == selected) {
-                /* Selected: Inverse highlight pill with no bullets */
-                if (is_dir) {
-                    printf("\x1b[30;48;5;110;1m %-*s \x1b[0m", (int)(cellw - 2), disp);
-                } else {
-                    printf("\x1b[30;48;5;189;1m %-*s \x1b[0m", (int)(cellw - 2), disp);
-                }
+                /* Selected: Vibrant purple pill highlight */
+                printf("\x1b[38;2;18;18;24;48;2;189;147;249;1m %-*s \x1b[0m", (int)(cellw - 2), disp);
             } else {
-                /* Unselected: clean pastel text */
+                /* Unselected: clean gray text (with cyan accent for directories) */
                 if (is_dir) {
-                    printf("\x1b[38;5;110;1m  %-*s\x1b[0m", (int)(cellw - 2), disp);
+                    printf("\x1b[38;2;139;190;255m  %-*s\x1b[0m", (int)(cellw - 2), disp);
                 } else {
-                    printf("\x1b[38;5;252m  %-*s\x1b[0m", (int)(cellw - 2), disp);
+                    printf("\x1b[38;2;140;145;165m  %-*s\x1b[0m", (int)(cellw - 2), disp);
                 }
             }
         }

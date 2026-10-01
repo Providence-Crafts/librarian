@@ -1,0 +1,19 @@
+# Clang-Tidy Strict Static Analysis Configuration
+---
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  misc-*,
+  performance-*,
+  readability-*,
+  -readability-identifier-length,
+  -readability-magic-numbers
+
+WarningsAsErrors: ''
+HeaderFilterRegex: 'include/.*'
+FormatStyle: file
+CheckOptions:
+  - key: readability-implicit-bool-conversion.AllowPointerConditions
+    value: 1

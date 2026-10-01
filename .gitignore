@@ -1,0 +1,22 @@
+/build/
+/bin/
+compile_commands.json
+.direnv/
+*.o
+*.d
+*.so
+*.a
+*.out
+*.log
+
+# Data and models
+models/*.gguf
+models/.cache/
+data/
+
+# Vendor builds and external repos
+vendor/llama.cpp/
+vendor/tomlc99/
+
+# Archive
+docs/archive

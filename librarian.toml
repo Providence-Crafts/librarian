@@ -1,0 +1,12 @@
+[database]
+path = "data/librarian.db"
+
+[embedder]
+model_path = "models/harrier-oss-v1-0.6b.Q8_0.gguf"
+dimension = 1024
+similarity_threshold = 0.65
+
+[generator]
+model_path = "models/MiniCPM5-2B-Q8_0.gguf"
+context_length = 2048
+confidence_threshold = 0.50

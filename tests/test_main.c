@@ -8,6 +8,9 @@ extern const char *test_config_defaults(void);
 extern const char *test_config_load_file(void);
 extern const char *test_ui_badges(void);
 extern const char *test_db_lifecycle_and_knn(void);
+extern const char *test_chunking_logic(void);
+extern const char *test_vector_normalization(void);
+extern const char *test_embedder_model(void);
 
 static const char *all_tests(void)
 {
@@ -15,6 +18,9 @@ static const char *all_tests(void)
     mu_run_test(test_config_load_file);
     mu_run_test(test_ui_badges);
     mu_run_test(test_db_lifecycle_and_knn);
+    mu_run_test(test_chunking_logic);
+    mu_run_test(test_vector_normalization);
+    mu_run_test(test_embedder_model);
     return NULL;
 }
 

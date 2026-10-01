@@ -209,16 +209,16 @@ Implement SQLite3 database initialization with `sqlite-vec` vector extension sta
 Implement the document text chunker with sliding window and overlap, and the embedding extraction pipeline using local GGUF models via `llama.h`.
 
 **Tasks**
-- [ ] Implement sliding window text chunker with configurable chunk size and token/word overlap in `src/embedder.c`.
-- [ ] Implement GGUF embedding model loader and context management via `llama.h` in `src/embedder.c` and `include/embedder.h`.
-- [ ] Extract embedding vectors from `llama_get_embeddings_seq` / `llama_get_embeddings_ith` and perform L2 normalization.
-- [ ] Directory and file traversal to read text documents for ingestion.
-- [ ] Write unit tests in `tests/test_embedder.c` testing chunking logic and embedding output dimensions.
+- [✓] Implement sliding window text chunker with configurable chunk size and token/word overlap in `src/embedder.c`.
+- [✓] Implement GGUF embedding model loader and context management via `llama.h` in `src/embedder.c` and `include/embedder.h`.
+- [✓] Extract embedding vectors from `llama_get_embeddings_seq` / `llama_get_embeddings_ith` and perform L2 normalization.
+- [✓] Directory and file traversal to read text documents for ingestion.
+- [✓] Write unit tests in `tests/test_embedder.c` testing chunking logic and embedding output dimensions.
 
 **Checks**
-- [ ] Chunker produces deterministic chunks with expected overlaps.
-- [ ] GGUF embedding model loads and computes 1024-dimensional normalized vectors matching `harrier-oss-v1-0.6b.Q8_0.gguf`.
-- [ ] L2 norm of generated vector equals $1.0 \pm 1e-4$.
+- [✓] Chunker produces deterministic chunks with expected overlaps.
+- [✓] GGUF embedding model loads and computes 1024-dimensional normalized vectors matching `harrier-oss-v1-0.6b.Q8_0.gguf`.
+- [✓] L2 norm of generated vector equals $1.0 \pm 1e-4$.
 
 ---
 

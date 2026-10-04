@@ -1,5 +1,6 @@
 #include "repl.h"
 
+#include "plat.h"
 #include "theme.h"
 #include "ui.h"
 
@@ -13,7 +14,6 @@
 #include <sys/stat.h>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
-#include <direct.h>
 #include <io.h>
 #include <windows.h>
 #ifndef STDIN_FILENO
@@ -22,13 +22,11 @@
 #endif
 #define isatty _isatty
 #define fileno _fileno
-#define mkdir_portable(p) _mkdir(p)
 #else
 #include <poll.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
-#define mkdir_portable(p) mkdir(p, 0755)
 #endif
 
 #define REPL_LINE_CAP_INIT 256
@@ -775,7 +773,7 @@ void repl_history_add(repl_context_t *repl, const char *line)
 #endif
         if (slash) {
             *slash = '\0';
-            mkdir_portable(dir_buf);
+            (void)plat_mkdir_p(dir_buf);
         }
 
         FILE *fp = fopen(repl->history_path, "a");

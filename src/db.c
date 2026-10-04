@@ -1,5 +1,6 @@
 #include "db.h"
 
+#include "plat.h"
 #include "sqlite-vec.h"
 #include "sqlite3.h"
 
@@ -9,13 +10,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-#ifdef _WIN32
-#include <direct.h>
-#define mkdir_portable(p) _mkdir(p)
-#else
-#define mkdir_portable(p) mkdir(p, 0755)
-#endif
 
 struct db_context {
     sqlite3 *handle;
@@ -35,7 +29,7 @@ static void ensure_dir_exists(const char *file_path)
     if (slash) {
         *slash = '\0';
         if (tmp[0] != '\0' && strcmp(tmp, ".") != 0) {
-            (void)mkdir_portable(tmp);
+            (void)plat_mkdir_p(tmp);
         }
     }
 }

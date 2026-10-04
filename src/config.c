@@ -1,18 +1,12 @@
 #include "config.h"
 
+#include "plat.h"
 #include "toml.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-
-#ifdef _WIN32
-#include <direct.h>
-#define mkdir_portable(p) _mkdir(p)
-#else
-#define mkdir_portable(p) mkdir(p, 0755)
-#endif
 
 int config_get_default_paths(char *config_path, size_t cfg_sz, char *data_dir, size_t data_sz)
 {
@@ -78,7 +72,7 @@ int config_save(const char *path, const librarian_config_t *cfg)
 #endif
     if (slash) {
         *slash = '\0';
-        mkdir_portable(dir);
+        (void)plat_mkdir_p(dir);
     }
 
     FILE *fp = fopen(path, "w");

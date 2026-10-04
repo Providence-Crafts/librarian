@@ -4,6 +4,7 @@
 #include "doc.h"
 #include "embedder.h"
 #include "logger.h"
+#include "plat.h"
 #include "ui.h"
 
 #include <pthread.h>
@@ -313,17 +314,7 @@ int pipeline_ingest_files(db_context_t *db, embedder_context_t *emb, char **file
     db_for_each_document_hash(db, doc_cache_populate_cb, &cache);
 
     /* Step 2: Determine worker thread count */
-    long nprocs = 4;
-#ifdef _WIN32
-    SYSTEM_INFO sysinfo;
-    GetSystemInfo(&sysinfo);
-    nprocs = (long)sysinfo.dwNumberOfProcessors;
-#else
-    nprocs = sysconf(_SC_NPROCESSORS_ONLN);
-#endif
-    if (nprocs < 1) {
-        nprocs = 4;
-    }
+    long nprocs = (long)plat_nprocs();
     /* Leave two cores for the main thread and the system once there are more than four. */
     int num_workers = (int)(nprocs > 4 ? nprocs - 2 : nprocs);
     if (num_workers > 8) {

@@ -2,6 +2,7 @@
 
 #include "ggml.h"
 #include "llama.h"
+#include "plat.h"
 #include "theme.h"
 
 #include <pthread.h>
@@ -13,9 +14,7 @@
 #include <time.h>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
-#include <direct.h>
 #include <process.h>
-#define mkdir_portable(p) _mkdir(p)
 #define getpid _getpid
 static inline struct tm *portable_localtime_r(const time_t *timer, struct tm *buf)
 {
@@ -25,7 +24,6 @@ static inline struct tm *portable_localtime_r(const time_t *timer, struct tm *bu
 #define localtime_r(t, b) portable_localtime_r(t, b)
 #else
 #include <unistd.h>
-#define mkdir_portable(p) mkdir(p, 0755)
 #endif
 
 #define LOGGER_MAX_FILE_SIZE (10L * 1024L * 1024L) /* 10 MB limit */
@@ -120,7 +118,7 @@ int logger_init(const char *log_path)
 #endif
     if (last_slash) {
         *last_slash = '\0';
-        (void)mkdir_portable(dir_buf);
+        (void)plat_mkdir_p(dir_buf);
     }
 
     g_log_fp = fopen(g_log_path, "a");

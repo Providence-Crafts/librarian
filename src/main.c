@@ -274,9 +274,8 @@ static void show_setup_walkthrough(void)
                              "`/setup` in chat.\n" STYLE_RESET "\n");
 }
 
-/* Shell out to mkdir and curl. Both arguments come from the user's own config
- * and are quoted for the platform's shell; mkdir -p and the plat layer's
- * replacement land with the Windows port. */
+/* Shell out to curl. Both arguments come from the user's own config and are
+ * quoted for the platform's shell. */
 static int download_file(const char *url, const char *dest_path)
 {
     char dir[512];
@@ -291,17 +290,7 @@ static int download_file(const char *url, const char *dest_path)
     char cmd[4096];
     if (slash) {
         *slash = '\0';
-#ifdef _WIN32
-        snprintf(cmd, sizeof(cmd), "if not exist \"%s\" mkdir \"%s\"", dir, dir);
-#else
-        char *qdir = doc_shell_escape(dir);
-        if (!qdir) {
-            return -1;
-        }
-        snprintf(cmd, sizeof(cmd), "mkdir -p %s", qdir);
-        free(qdir);
-#endif
-        if (system(cmd) != 0) { /* NOLINT(cert-env33-c) */
+        if (!plat_mkdir_p(dir)) {
             logger_warn("Could not create directory '%s'; curl will report the failure", dir);
         }
     }

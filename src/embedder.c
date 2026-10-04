@@ -1,6 +1,7 @@
 #include "embedder.h"
 
 #include "llama.h"
+#include "plat.h"
 
 #include <ctype.h>
 #include <math.h>
@@ -174,14 +175,7 @@ void chunk_list_free(chunk_list_t *list)
 
 static int get_optimal_thread_count(void)
 {
-    long n = 4;
-#ifdef _WIN32
-    SYSTEM_INFO sysinfo;
-    GetSystemInfo(&sysinfo);
-    n = (long)sysinfo.dwNumberOfProcessors;
-#else
-    n = sysconf(_SC_NPROCESSORS_ONLN);
-#endif
+    long n = (long)plat_nprocs();
     if (n <= 1) {
         return 1;
     }

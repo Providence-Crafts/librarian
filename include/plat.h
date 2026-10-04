@@ -62,6 +62,8 @@ char *plat_state_dir(void);  /* $XDG_STATE_HOME or ~/.local/state, %LOCALAPPDATA
 const char *plat_temp_dir(void);
 
 bool plat_mkdir(const char *path); /* one level; false if it cannot be made */
+/* PATH and every missing parent; true when PATH is a directory afterwards. */
+bool plat_mkdir_p(const char *path);
 bool plat_chdir(const char *path);
 
 /* Creates an empty, uniquely named file under the temp dir and writes its path
@@ -95,6 +97,9 @@ void plat_clock(PlatClock *c);
 /* ASCII case-insensitive compare: POSIX strcasecmp, Windows _stricmp. */
 int plat_strcasecmp(const char *lhs, const char *rhs);
 int plat_strncasecmp(const char *lhs, const char *rhs, size_t count);
+
+/* Online CPUs, at least 1. */
+unsigned plat_nprocs(void);
 
 /* Milliseconds on a monotonic clock, for measuring intervals. False when the
  * platform has none. */

@@ -16,6 +16,7 @@
 #include <time.h>
 #include <unistd.h>
 
+/* NOLINTNEXTLINE(readability-non-const-parameter): plat_win32.c writes through both */
 void plat_init(int *argc, char ***argv)
 {
     (void)argc;
@@ -260,6 +261,31 @@ bool plat_mkdir(const char *path)
     return mkdir(path, 0700) == 0;
 }
 
+bool plat_mkdir_p(const char *path)
+{
+    size_t n = strlen(path);
+    char *copy = (char *)malloc(n + 1u);
+    struct stat st;
+    size_t i;
+    bool ok;
+
+    if (copy == NULL) {
+        return false;
+    }
+    memcpy(copy, path, n + 1u);
+    for (i = 1u; i < n; i++) {
+        if (copy[i] == '/') {
+            copy[i] = '\0';
+            (void)mkdir(copy, 0700);
+            copy[i] = '/';
+        }
+    }
+    (void)mkdir(copy, 0700);
+    ok = stat(copy, &st) == 0 && S_ISDIR(st.st_mode);
+    free(copy);
+    return ok;
+}
+
 bool plat_chdir(const char *path)
 {
     return chdir(path) == 0;
@@ -355,6 +381,13 @@ int plat_strcasecmp(const char *lhs, const char *rhs)
 int plat_strncasecmp(const char *lhs, const char *rhs, size_t count)
 {
     return strncasecmp(lhs, rhs, count);
+}
+
+unsigned plat_nprocs(void)
+{
+    long n = sysconf(_SC_NPROCESSORS_ONLN);
+
+    return n > 0 ? (unsigned)n : 1u;
 }
 
 bool plat_monotonic_ms(long long *ms)

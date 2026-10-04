@@ -435,6 +435,40 @@ bool plat_mkdir(const char *path)
     return _mkdir(path) == 0;
 }
 
+static bool is_dir(const char *path)
+{
+    DWORD attr = GetFileAttributesA(path);
+
+    return attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) != 0u;
+}
+
+/* Either separator counts; a drive prefix ("C:") is never created. */
+bool plat_mkdir_p(const char *path)
+{
+    size_t n = strlen(path);
+    char *copy = (char *)malloc(n + 1u);
+    size_t i;
+    bool ok;
+
+    if (copy == NULL) {
+        return false;
+    }
+    memcpy(copy, path, n + 1u);
+    for (i = 1u; i < n; i++) {
+        if ((copy[i] == '/' || copy[i] == '\\') && copy[i - 1u] != ':') {
+            char sep = copy[i];
+
+            copy[i] = '\0';
+            (void)_mkdir(copy);
+            copy[i] = sep;
+        }
+    }
+    (void)_mkdir(copy);
+    ok = is_dir(copy);
+    free(copy);
+    return ok;
+}
+
 bool plat_chdir(const char *path)
 {
     return _chdir(path) == 0;
@@ -500,11 +534,10 @@ int plat_open_file(const char *path, char *cmd, size_t size)
 
 static double filetime_seconds(FILETIME ft)
 {
-    ULARGE_INTEGER v;
+    unsigned long long ticks =
+        ((unsigned long long)ft.dwHighDateTime << 32) | (unsigned long long)ft.dwLowDateTime;
 
-    v.LowPart = ft.dwLowDateTime;
-    v.HighPart = ft.dwHighDateTime;
-    return (double)v.QuadPart / 1.0e7; /* 100 ns ticks */
+    return (double)ticks / 1.0e7; /* 100 ns ticks */
 }
 
 void plat_clock(PlatClock *c)
@@ -534,6 +567,14 @@ int plat_strcasecmp(const char *lhs, const char *rhs)
 int plat_strncasecmp(const char *lhs, const char *rhs, size_t count)
 {
     return _strnicmp(lhs, rhs, count);
+}
+
+unsigned plat_nprocs(void)
+{
+    SYSTEM_INFO info;
+
+    GetSystemInfo(&info);
+    return info.dwNumberOfProcessors > 0u ? (unsigned)info.dwNumberOfProcessors : 1u;
 }
 
 bool plat_monotonic_ms(long long *ms)

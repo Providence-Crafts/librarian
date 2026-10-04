@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: ProvidenceCrafts.librarian
+PackageVersion: 0.1.0
+PackageLocale: en-GB
+Publisher: Providence Crafts
+PublisherUrl: https://github.com/Providence-Crafts
+PackageName: librarian
+PackageUrl: https://github.com/Providence-Crafts/librarian
+License: GPL-3.0-or-later
+LicenseUrl: https://github.com/Providence-Crafts/librarian/blob/main/LICENSE
+ShortDescription: Local question answering over your own documents, with cited answers.
+Description: |-
+  librarian indexes your documents into SQLite with a local GGUF embedding model and
+  answers questions about them with a local GGUF language model, citing the passages
+  it used and refusing when retrieval is too weak. One static binary, no server, no
+  network after `librarian setup` downloads the models.
+Moniker: librarian
+Tags:
+  - rag
+  - llm
+  - search
+  - sqlite
+  - cli
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

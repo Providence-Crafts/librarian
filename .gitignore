@@ -20,3 +20,8 @@ vendor/tomlc99/
 
 # Archive
 docs/archive
+
+# Planning notes, kept local
+project_librarian.md
+prompt.md
+notes.md

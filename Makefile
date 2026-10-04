@@ -247,6 +247,7 @@ cppcheck:
 	         --suppress=checkersReport \
 	         --suppress=unusedFunction \
 	         --suppress='*:vendor/*' \
+	         --suppress=unreadVariable:src/plat_win32.c \
 	         --error-exitcode=1 --std=c99 --inline-suppr \
 	         -I$(INC_DIR) -I$(VENDOR_DIR)/sqlite -I$(VENDOR_DIR)/sqlite-vec -I$(VENDOR_DIR)/tomlc99 -I$(VENDOR_DIR)/llama.cpp/include -I$(VENDOR_DIR)/llama.cpp/ggml/include \
 	         $(SRC_DIR) $(INC_DIR)

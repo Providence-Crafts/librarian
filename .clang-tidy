@@ -35,6 +35,11 @@
 #                                      failed write to the UI has no useful
 #                                      recovery
 #
+#   readability-non-const-parameter  flags plat_init(int *argc, ...) in
+#                                      plat_posix.c, a file shared verbatim
+#                                      with redstone whose Windows twin
+#                                      writes through argc
+#
 # HeaderFilterRegex is anchored on the project directory: a bare 'include/.*'
 # also matches /nix/store/<pkg>-dev/include/, which reports warnings from
 # sqlite3.h and glibc that we neither own nor can fix.
@@ -54,7 +59,8 @@ Checks: >
   -bugprone-easily-swappable-parameters,
   -cert-err33-c,
   -readability-function-cognitive-complexity,
-  -bugprone-multi-level-implicit-pointer-conversion
+  -bugprone-multi-level-implicit-pointer-conversion,
+  -readability-non-const-parameter
 
 WarningsAsErrors: '*'
 HeaderFilterRegex: 'librarian/(include|src|tests)/[^/]*\.h$'

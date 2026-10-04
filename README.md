@@ -18,11 +18,20 @@ answer lists the passages it drew on. Sibling of
 design language. `librarian --help` is the full reference; this file is the
 tour.
 
+<p align="center"><img src="docs/demo.gif" alt="librarian demo: ingest a folder in chat, then ask a question and get a cited answer" width="720"></p>
+
 ## Install
 
-No prebuilt packages yet, on Linux or on Windows (winget); build from source as
-below. The first run of `librarian setup` downloads the two default models
-(about 3.5 GB) from Hugging Face with `curl`.
+- **Linux** (x86-64): download `librarian-X.Y.Z-linux-x86_64.tar.gz` from the
+  [releases](https://github.com/Providence-Crafts/librarian/releases), check it
+  against `SHA256SUMS`, and put `librarian` on your `PATH`.
+- **Windows** (10 1809+, x64): `winget install ProvidenceCrafts.librarian` once
+  the manifest is accepted, or unzip `librarian-X.Y.Z-windows-x86_64.zip` from
+  the releases; the `.exe` is static and needs no DLLs.
+- **From source**: see [Build](#build).
+
+Models are not bundled. The first run of `librarian setup` downloads the two
+default models (about 3.5 GB) from Hugging Face with `curl`.
 
 ## Build
 
@@ -105,12 +114,19 @@ file with `[brand]` (`glyph`, `name`, `tagline`, `facts`), `[status]`
 `NO_COLOR` and `TERM=dumb` turn colour off; the bookshelf banner is drawn only
 with colour, a UTF-8 locale, truecolor and at least 67 columns.
 
+## Parity
+
+Does not apply: librarian makes no compatibility claim against another tool.
+
 ## Platforms
 
 Linux x86-64 is the primary platform; the gate runs there. Windows 10 1809+
-is cross-compiled with MinGW-w64 (`nix develop .#windows`, then
-`make windows`, which builds its own `llama.cpp`) but not yet tested natively; on Windows the line editor
-falls back to plain line input without completion or history keys. macOS
+gets a static `.exe` built with MinGW-w64, cross-compiled
+(`nix develop .#windows`, then `make windows`, which builds its own
+`llama.cpp`) or natively under MSYS2 in CI. It is exercised under Wine (ingest
+and cited answers work) but not yet on real Windows, and the unit tests do not
+run there; the line editor falls back to plain line input without completion or
+history keys. macOS
 builds from source with config and data under
 `~/Library/Application Support/librarian/`. CPU inference only: `setup.sh`
 builds `llama.cpp` without GPU back ends.

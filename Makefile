@@ -34,6 +34,11 @@ WARNING_FLAGS = \
 	-Wcast-qual \
 	-Wwrite-strings
 
+# `make WARNINGS_AS_ERRORS=1` (the gate does) turns every warning into an error.
+ifeq ($(WARNINGS_AS_ERRORS),1)
+WARNING_FLAGS += -Werror
+endif
+
 INCLUDES = \
 	-I$(INC_DIR) \
 	-isystem $(VENDOR_DIR)/sqlite \
@@ -97,7 +102,7 @@ LDFLAGS :=
 # Vendor compile flags (relaxed warnings for 3rd-party code)
 VENDOR_CFLAGS = -std=c99 -O3 -isystem $(VENDOR_DIR)/sqlite -isystem $(VENDOR_DIR)/sqlite-vec -isystem $(VENDOR_DIR)/tomlc99 -DSQLITE_THREADSAFE=1 -DSQLITE_ENABLE_NORMALIZE -DSQLITE_ENABLE_FTS5 $(DEFINES)
 
-.PHONY: all clean release debug asan tsan test valgrind tidy cppcheck format compdb watch windows help
+.PHONY: all clean release debug asan tsan test valgrind tidy cppcheck format format-check gate compdb watch windows help
 
 all: release
 
@@ -224,9 +229,16 @@ valgrind: debug
 	         --error-exitcode=1 \
 	         ./$(BIN_DIR)/$(TARGET_NAME) --version
 
+# Under nix, the cc-wrapper injects glibc's include directory but clang-tidy
+# runs the unwrapped clang, so <stdio.h> goes missing. Ask the compiler where
+# its headers are. -U_FORTIFY_SOURCE silences glibc's #warning at -O0.
+TIDY_SYS_INCLUDES = $(shell $(CC) -E -Wp,-v -xc /dev/null 2>&1 | \
+	sed -n 's|^ \(/[^ ]*\)$$|--extra-arg-before=-isystem\1|p')
+TIDY_EXTRA = --extra-arg=-U_FORTIFY_SOURCE
+
 tidy:
-	@echo "🧹 Running clang-tidy analysis..."
-	clang-tidy $(SRCS) -- $(INCLUDES) $(DEFINES) $(STD) $(NIX_CFLAGS_COMPILE)
+	clang-tidy --quiet --warnings-as-errors='*' $(TIDY_SYS_INCLUDES) $(TIDY_EXTRA) $(SRCS) $(TEST_SRCS) -- \
+	           $(STD) $(INCLUDES) $(DEFINES) -I$(TEST_DIR)
 
 cppcheck:
 	@echo "🛡️ Running cppcheck..."
@@ -235,13 +247,27 @@ cppcheck:
 	         --suppress=checkersReport \
 	         --suppress=unusedFunction \
 	         --suppress='*:vendor/*' \
-	         --error-exitcode=1 \
+	         --error-exitcode=1 --std=c99 --inline-suppr \
 	         -I$(INC_DIR) -I$(VENDOR_DIR)/sqlite -I$(VENDOR_DIR)/sqlite-vec -I$(VENDOR_DIR)/tomlc99 -I$(VENDOR_DIR)/llama.cpp/include -I$(VENDOR_DIR)/llama.cpp/ggml/include \
 	         $(SRC_DIR) $(INC_DIR)
 
 format:
 	@echo "✨ Formatting source code..."
 	clang-format -i $(wildcard $(SRC_DIR)/*.c) $(wildcard $(INC_DIR)/*.h) $(wildcard $(TEST_DIR)/*.c) $(wildcard $(TEST_DIR)/*.h)
+
+format-check:
+	@clang-format --dry-run --Werror $(wildcard $(SRC_DIR)/*.c) $(wildcard $(INC_DIR)/*.h) \
+	              $(wildcard $(TEST_DIR)/*.c) $(wildcard $(TEST_DIR)/*.h)
+
+# The single definition of done (docs/family.md): run it in `nix develop`.
+gate:
+	@echo "== gate: format ==";   $(MAKE) --no-print-directory format-check
+	@echo "== gate: build ==";    $(MAKE) --no-print-directory clean
+	@$(MAKE) --no-print-directory release WARNINGS_AS_ERRORS=1
+	@echo "== gate: tests (asan+ubsan) =="; $(MAKE) --no-print-directory test WARNINGS_AS_ERRORS=1
+	@echo "== gate: cppcheck =="; $(MAKE) --no-print-directory cppcheck
+	@echo "== gate: clang-tidy =="; $(MAKE) --no-print-directory tidy
+	@echo "PASS"
 
 compdb: clean
 	@echo "📝 Generating compile_commands.json via bear..."
@@ -274,6 +300,7 @@ help:
 	@echo "  make tidy       - Run clang-tidy static analysis"
 	@echo "  make cppcheck   - Run cppcheck static analyzer"
 	@echo "  make format     - Auto-format code with clang-format"
+	@echo "  make gate       - Format check, -Werror build, tests, cppcheck, clang-tidy"
 	@echo "  make compdb     - Generate compile_commands.json for clangd"
 	@echo "  make watch      - Automatically rerun tests on change"
 	@echo "  make windows    - Cross-compile Windows binary (bin/librarian.exe)"

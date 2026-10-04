@@ -1,4 +1,43 @@
-# Clang-Tidy Strict Static Analysis Configuration
+# Clang-Tidy configuration for librarian.
+#
+# Disabled checks, and why (comments must live outside the folded `Checks:`
+# scalar below, or they become part of the check list):
+#
+#   readability-identifier-length      short loop/param names are fine
+#   readability-magic-numbers          buffer sizes and caps read better inline
+#   readability-uppercase-literal-suffix
+#                                      lowercase 0u/1ul is the prevailing C
+#                                      idiom; the rule exists for the l/1
+#                                      ambiguity, which u does not have
+#   misc-include-cleaner               fights the convention that a module
+#                                      header owns the includes its own
+#                                      declarations need
+#   bugprone-easily-swappable-parameters
+#                                      (FILE *out, FILE *err) and similar are
+#                                      deliberate and read clearly at call sites
+#
+#   readability-function-cognitive-complexity
+#                                      the functions over the threshold are
+#                                      flat dispatchers (the CLI router in
+#                                      main.c, the REPL key loop, the document
+#                                      format extractors) whose many one-line
+#                                      branches score high without any branch
+#                                      being deep
+#   bugprone-multi-level-implicit-pointer-conversion
+#                                      it fires on malloc/realloc into char **.
+#                                      C converts void * implicitly by design
+#                                      and casting the result of malloc is
+#                                      discouraged in C, so the "fix" would add
+#                                      noise and hide a missing <stdlib.h>
+#
+#   cert-err33-c                     would require checking the return of
+#                                      every printf/fputs to the terminal; a
+#                                      failed write to the UI has no useful
+#                                      recovery
+#
+# HeaderFilterRegex is anchored on the project directory: a bare 'include/.*'
+# also matches /nix/store/<pkg>-dev/include/, which reports warnings from
+# sqlite3.h and glibc that we neither own nor can fix.
 ---
 Checks: >
   -*,
@@ -9,10 +48,16 @@ Checks: >
   performance-*,
   readability-*,
   -readability-identifier-length,
-  -readability-magic-numbers
+  -readability-magic-numbers,
+  -readability-uppercase-literal-suffix,
+  -misc-include-cleaner,
+  -bugprone-easily-swappable-parameters,
+  -cert-err33-c,
+  -readability-function-cognitive-complexity,
+  -bugprone-multi-level-implicit-pointer-conversion
 
-WarningsAsErrors: ''
-HeaderFilterRegex: 'include/.*'
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'librarian/(include|src|tests)/[^/]*\.h$'
 FormatStyle: file
 CheckOptions:
   - key: readability-implicit-bool-conversion.AllowPointerConditions

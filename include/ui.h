@@ -49,7 +49,10 @@ void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *ch
                     int limit);
 bool ui_confirm(const char *prompt);
 
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__MINGW32__)
+/* printf means msvcrt's dialect to MinGW GCC; the build selects C99 stdio. */
+#define ATTR_PRINTF(fmt_idx, arg_idx) __attribute__((format(gnu_printf, fmt_idx, arg_idx)))
+#elif defined(__GNUC__) || defined(__clang__)
 #define ATTR_PRINTF(fmt_idx, arg_idx) __attribute__((format(printf, fmt_idx, arg_idx)))
 #else
 #define ATTR_PRINTF(fmt_idx, arg_idx)

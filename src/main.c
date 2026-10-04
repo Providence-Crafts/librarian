@@ -276,6 +276,19 @@ static void show_setup_walkthrough(void)
                              "`/setup` in chat.\n" STYLE_RESET "\n");
 }
 
+/* Size of a file in bytes, or -1 if it cannot be stat'ed. Models exceed 2 GiB,
+ * which overflows the 32-bit st_size of MinGW's plain stat(). */
+static long long file_size(const char *path)
+{
+#ifdef _WIN32
+    struct _stat64 st;
+    return _stat64(path, &st) == 0 ? (long long)st.st_size : -1;
+#else
+    struct stat st;
+    return stat(path, &st) == 0 ? (long long)st.st_size : -1;
+#endif
+}
+
 /* Shell out to curl. Both arguments come from the user's own config and are
  * quoted for the platform's shell. */
 static int download_file(const char *url, const char *dest_path)
@@ -336,12 +349,12 @@ static int subcmd_setup(librarian_config_t *cfg, bool force)
     }
 
     /* 1. Embedder */
-    struct stat st;
+    long long size = file_size(cfg->embed_model_path);
     bool download_emb = true;
-    if (stat(cfg->embed_model_path, &st) == 0 && st.st_size > 1000000) {
+    if (size > 1000000) {
         if (!force) {
             ui_info("Embedding model already exists: %s (%.1f MB)", cfg->embed_model_path,
-                    (double)st.st_size / (1024.0 * 1024.0));
+                    (double)size / (1024.0 * 1024.0));
             download_emb = ui_confirm("Do you want to re-download the embedding model? [y/N]:");
         }
     }
@@ -356,10 +369,11 @@ static int subcmd_setup(librarian_config_t *cfg, bool force)
 
     /* 2. Generator */
     bool download_gen = true;
-    if (stat(cfg->gen_model_path, &st) == 0 && st.st_size > 1000000) {
+    size = file_size(cfg->gen_model_path);
+    if (size > 1000000) {
         if (!force) {
             ui_info("Generation model already exists: %s (%.1f MB)", cfg->gen_model_path,
-                    (double)st.st_size / (1024.0 * 1024.0));
+                    (double)size / (1024.0 * 1024.0));
             download_gen = ui_confirm("Do you want to re-download the generation model? [y/N]:");
         }
     }
@@ -378,10 +392,8 @@ static int subcmd_setup(librarian_config_t *cfg, bool force)
 
 static int check_or_setup_models(librarian_config_t *cfg, bool need_generator)
 {
-    struct stat st;
-    bool emb_missing = (stat(cfg->embed_model_path, &st) != 0 || st.st_size < 1000000);
-    bool gen_missing =
-        need_generator && (stat(cfg->gen_model_path, &st) != 0 || st.st_size < 1000000);
+    bool emb_missing = file_size(cfg->embed_model_path) < 1000000;
+    bool gen_missing = need_generator && file_size(cfg->gen_model_path) < 1000000;
 
     if (emb_missing || gen_missing) {
         if (isatty(fileno(stdin))) {

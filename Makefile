@@ -128,6 +128,8 @@ tsan: $(BIN_DIR)/$(TARGET_NAME)
 WIN_CC ?= x86_64-w64-mingw32-gcc
 WIN_CXX ?= x86_64-w64-mingw32-g++
 WIN_BUILD_DIR = $(BUILD_DIR)/win
+# C99 printf (%zu and friends) from the MinGW runtime rather than msvcrt's.
+WIN_DEFINES = -D__USE_MINGW_ANSI_STDIO=1
 WIN_OBJS = $(patsubst $(SRC_DIR)/%.c, $(WIN_BUILD_DIR)/%.o, $(SRCS))
 WIN_VENDOR_OBJS = \
 	$(WIN_BUILD_DIR)/vendor/sqlite3.o \
@@ -144,10 +146,10 @@ WIN_LLAMA_LIBS = \
 windows: $(BIN_DIR)/$(TARGET_NAME).exe
 
 $(BIN_DIR)/$(TARGET_NAME).exe: $(WIN_OBJS) $(WIN_VENDOR_OBJS) $(WIN_LLAMA_LIBS) | $(BIN_DIR)
-	$(WIN_CC) $(WIN_OBJS) $(WIN_VENDOR_OBJS) $(WIN_LLAMA_LIBS) -o $@ -lstdc++ -lm -lpthread
+	$(WIN_CC) -static $(WIN_OBJS) $(WIN_VENDOR_OBJS) $(WIN_LLAMA_LIBS) -o $@ -lstdc++ -lm -lpthread
 
 $(WIN_BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(WIN_BUILD_DIR)
-	$(WIN_CC) $(STD) $(WARNING_FLAGS) $(INCLUDES) $(DEFINES) -O3 -DNDEBUG -MMD -MP -c $< -o $@
+	$(WIN_CC) $(STD) $(WARNING_FLAGS) $(INCLUDES) $(DEFINES) $(WIN_DEFINES) -O3 -DNDEBUG -MMD -MP -c $< -o $@
 
 $(WIN_BUILD_DIR)/vendor/sqlite3.o: $(VENDOR_DIR)/sqlite/sqlite3.c | $(WIN_BUILD_DIR)/vendor
 	$(WIN_CC) $(VENDOR_CFLAGS) -c $< -o $@

@@ -24,7 +24,8 @@ tour.
 
 - **Linux** (x86-64): download `librarian-X.Y.Z-linux-x86_64.tar.gz` from the
   [releases](https://github.com/Providence-Crafts/librarian/releases), check it
-  against `SHA256SUMS`, and put `librarian` on your `PATH`.
+  against `SHA256SUMS`, and put `librarian` on your `PATH`. It needs glibc
+  2.35+, `libstdc++` and `libgomp`, present on any mainstream distribution.
 - **Windows** (10 1809+, x64): `winget install ProvidenceCrafts.librarian` once
   the manifest is accepted, or unzip `librarian-X.Y.Z-windows-x86_64.zip` from
   the releases; the `.exe` is static and needs no DLLs.

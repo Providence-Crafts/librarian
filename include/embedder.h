@@ -19,6 +19,10 @@ embedder_context_t *embedder_init(const char *model_path, int dimension);
 void embedder_free(embedder_context_t *ctx);
 
 int embedder_embed(embedder_context_t *ctx, const char *text, float *out_vec);
+int embedder_embed_batch(embedder_context_t *ctx, const char *const *texts, float **out_vecs,
+                         int count);
+int embedder_get_thread_count(const embedder_context_t *ctx);
 void vector_normalize_l2(float *vec, int dim);
+void utf8_sanitize(char *str);
 
 #endif /* LIBRARIAN_EMBEDDER_H */

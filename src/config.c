@@ -5,6 +5,97 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+
+#if defined(_WIN32)
+#include <direct.h>
+#define mkdir_portable(p) _mkdir(p)
+#else
+#define mkdir_portable(p) mkdir(p, 0755)
+#endif
+
+int config_get_default_paths(char *config_path, size_t cfg_sz, char *data_dir, size_t data_sz)
+{
+    if (!config_path || cfg_sz == 0 || !data_dir || data_sz == 0) {
+        return -1;
+    }
+
+#if defined(_WIN32)
+    const char *appdata = getenv("APPDATA");
+    const char *localappdata = getenv("LOCALAPPDATA");
+    if (!appdata) {
+        appdata = "C:\\ProgramData";
+    }
+    if (!localappdata) {
+        localappdata = appdata;
+    }
+    snprintf(config_path, cfg_sz, "%s\\librarian\\librarian.toml", appdata);
+    snprintf(data_dir, data_sz, "%s\\librarian", localappdata);
+#elif defined(__APPLE__)
+    const char *home = getenv("HOME");
+    if (!home) {
+        home = "/tmp";
+    }
+    snprintf(config_path, cfg_sz, "%s/Library/Application Support/librarian/librarian.toml", home);
+    snprintf(data_dir, data_sz, "%s/Library/Application Support/librarian", home);
+#else
+    const char *xdg_cfg = getenv("XDG_CONFIG_HOME");
+    const char *xdg_data = getenv("XDG_DATA_HOME");
+    const char *home = getenv("HOME");
+    if (xdg_cfg && xdg_cfg[0]) {
+        snprintf(config_path, cfg_sz, "%s/librarian/librarian.toml", xdg_cfg);
+    } else if (home && home[0]) {
+        snprintf(config_path, cfg_sz, "%s/.config/librarian/librarian.toml", home);
+    } else {
+        snprintf(config_path, cfg_sz, "librarian.toml");
+    }
+
+    if (xdg_data && xdg_data[0]) {
+        snprintf(data_dir, data_sz, "%s/librarian", xdg_data);
+    } else if (home && home[0]) {
+        snprintf(data_dir, data_sz, "%s/.local/share/librarian", home);
+    } else {
+        snprintf(data_dir, data_sz, "data");
+    }
+#endif
+    return 0;
+}
+
+int config_save(const char *path, const librarian_config_t *cfg)
+{
+    if (!path || !cfg) {
+        return -1;
+    }
+
+    /* Ensure parent directory exists */
+    char dir[512];
+    strncpy(dir, path, sizeof(dir) - 1);
+    dir[sizeof(dir) - 1] = '\0';
+    char *slash = strrchr(dir, '/');
+#if defined(_WIN32)
+    if (!slash) slash = strrchr(dir, '\\');
+#endif
+    if (slash) {
+        *slash = '\0';
+        mkdir_portable(dir);
+    }
+
+    FILE *fp = fopen(path, "w");
+    if (!fp) {
+        return -1;
+    }
+
+    fprintf(fp, "[database]\npath = \"%s\"\n\n", cfg->db_path);
+    fprintf(fp, "[embedder]\nmodel_path = \"%s\"\ndimension = %d\nsimilarity_threshold = %.2f\n"
+                "chunk_size_words = %d\nchunk_overlap_words = %d\n\n",
+            cfg->embed_model_path, cfg->embed_dimension, (double)cfg->similarity_threshold,
+            cfg->chunk_size_words, cfg->chunk_overlap_words);
+    fprintf(fp, "[generator]\nmodel_path = \"%s\"\ncontext_length = %d\nconfidence_threshold = %.2f\n",
+            cfg->gen_model_path, cfg->gen_context_length, (double)cfg->confidence_threshold);
+
+    fclose(fp);
+    return 0;
+}
 
 void config_default(librarian_config_t *cfg)
 {
@@ -12,16 +103,32 @@ void config_default(librarian_config_t *cfg)
         return;
     memset(cfg, 0, sizeof(*cfg));
 
-    snprintf(cfg->db_path, sizeof(cfg->db_path), "data/librarian.db");
-    snprintf(cfg->log_path, sizeof(cfg->log_path), "data/librarian.log");
+    char sys_cfg[512] = {0};
+    char sys_data[512] = {0};
+    config_get_default_paths(sys_cfg, sizeof(sys_cfg), sys_data, sizeof(sys_data));
 
-    snprintf(cfg->embed_model_path, sizeof(cfg->embed_model_path),
-             "models/harrier-oss-v1-0.6b.Q8_0.gguf");
+    /* If running locally with data/ folder, prefer relative paths */
+    struct stat st;
+    if (stat("librarian.toml", &st) == 0 || stat("data", &st) == 0) {
+        snprintf(cfg->db_path, sizeof(cfg->db_path), "data/librarian.db");
+        snprintf(cfg->log_path, sizeof(cfg->log_path), "data/librarian.log");
+        snprintf(cfg->embed_model_path, sizeof(cfg->embed_model_path),
+                 "models/harrier-oss-v1-0.6b.Q8_0.gguf");
+        snprintf(cfg->gen_model_path, sizeof(cfg->gen_model_path), "models/MiniCPM5-2B-Q8_0.gguf");
+    } else {
+        snprintf(cfg->db_path, sizeof(cfg->db_path), "%s/librarian.db", sys_data);
+        snprintf(cfg->log_path, sizeof(cfg->log_path), "%s/librarian.log", sys_data);
+        snprintf(cfg->embed_model_path, sizeof(cfg->embed_model_path),
+                 "%s/models/harrier-oss-v1-0.6b.Q8_0.gguf", sys_data);
+        snprintf(cfg->gen_model_path, sizeof(cfg->gen_model_path),
+                 "%s/models/MiniCPM5-2B-Q8_0.gguf", sys_data);
+    }
+
     cfg->embed_dimension = 1024;
     cfg->similarity_threshold = 0.65f;
-
-    snprintf(cfg->gen_model_path, sizeof(cfg->gen_model_path), "models/MiniCPM5-2B-Q8_0.gguf");
-    cfg->gen_context_length = 2048;
+    cfg->chunk_size_words = 250;
+    cfg->chunk_overlap_words = 40;
+    cfg->gen_context_length = 4096;
     cfg->confidence_threshold = 0.50f;
 }
 
@@ -29,7 +136,25 @@ int config_load(const char *path, librarian_config_t *cfg)
 {
     config_default(cfg);
 
-    FILE *fp = fopen(path, "r");
+    const char *actual_path = path;
+    char sys_cfg[512] = {0};
+    char sys_data[512] = {0};
+
+    if (!actual_path || actual_path[0] == '\0') {
+        struct stat st;
+        if (stat("librarian.toml", &st) == 0) {
+            actual_path = "librarian.toml";
+        } else {
+            config_get_default_paths(sys_cfg, sizeof(sys_cfg), sys_data, sizeof(sys_data));
+            if (stat(sys_cfg, &st) == 0) {
+                actual_path = sys_cfg;
+            } else {
+                actual_path = "librarian.toml";
+            }
+        }
+    }
+
+    FILE *fp = fopen(actual_path, "r");
     if (!fp) {
         return -1;
     }
@@ -39,7 +164,7 @@ int config_load(const char *path, librarian_config_t *cfg)
     fclose(fp);
 
     if (!root) {
-        fprintf(stderr, "Error parsing TOML config %s: %s\n", path, errbuf);
+        fprintf(stderr, "Error parsing TOML config %s: %s\n", actual_path, errbuf);
         return -2;
     }
 
@@ -70,6 +195,14 @@ int config_load(const char *path, librarian_config_t *cfg)
         toml_datum_t d_sim = toml_double_in(tab_emb, "similarity_threshold");
         if (d_sim.ok) {
             cfg->similarity_threshold = (float)d_sim.u.d;
+        }
+        toml_datum_t d_cs = toml_int_in(tab_emb, "chunk_size_words");
+        if (d_cs.ok && d_cs.u.i > 0) {
+            cfg->chunk_size_words = (int)d_cs.u.i;
+        }
+        toml_datum_t d_co = toml_int_in(tab_emb, "chunk_overlap_words");
+        if (d_co.ok && d_co.u.i >= 0) {
+            cfg->chunk_overlap_words = (int)d_co.u.i;
         }
     }
 
@@ -120,8 +253,9 @@ void config_print(const librarian_config_t *cfg)
     printf("Configuration:\n");
     printf("  [database] path = %s\n", cfg->db_path);
     printf("  [logging] path = %s\n", cfg->log_path);
-    printf("  [embedder] model = %s (dim=%d, sim_thresh=%.2f)\n", cfg->embed_model_path,
-           cfg->embed_dimension, (double)cfg->similarity_threshold);
+    printf("  [embedder] model = %s (dim=%d, sim_thresh=%.2f, chunk_size=%d, overlap=%d)\n",
+           cfg->embed_model_path, cfg->embed_dimension, (double)cfg->similarity_threshold,
+           cfg->chunk_size_words, cfg->chunk_overlap_words);
     printf("  [generator] model = %s (ctx=%d, conf_thresh=%.2f)\n", cfg->gen_model_path,
            cfg->gen_context_length, (double)cfg->confidence_threshold);
 }

@@ -1,5 +1,6 @@
 #include "generator.h"
 
+#include "embedder.h"
 #include "llama.h"
 
 #include <ctype.h>
@@ -23,6 +24,7 @@ generator_context_t *generator_init(const char *model_path, int context_length)
     llama_backend_init();
 
     struct llama_model_params mparams = llama_model_default_params();
+    mparams.n_gpu_layers = 99;
     struct llama_model *model = llama_model_load_from_file(model_path, mparams);
     if (!model) {
         fprintf(stderr, "Failed to load generator model from %s\n", model_path);
@@ -30,7 +32,7 @@ generator_context_t *generator_init(const char *model_path, int context_length)
     }
 
     struct llama_context_params cparams = llama_context_default_params();
-    cparams.n_ctx = (context_length > 0) ? (uint32_t)context_length : 2048;
+    cparams.n_ctx = (context_length > 0) ? (uint32_t)context_length : 4096;
     cparams.n_batch = 512;
     cparams.embeddings = false;
 
@@ -133,15 +135,18 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
 
     size_t written = (size_t)snprintf(
         prompt, prompt_cap,
-        "You are an accurate, honest AI knowledge assistant. "
-        "Answer the user's question using ONLY the provided context snippets below. "
-        "If the context does not explicitly contain the answer, or if you are unsure, "
-        "respond ONLY with \"" REFUSAL_INSUFFICIENT_DATA_TOKEN "\".\n\n"
-        "--- Context ---\n");
+        "<|im_start|>system\n"
+        "You are an accurate, honest, and direct AI knowledge assistant.\n"
+        "Answer the user's question clearly and concisely using ONLY the verified context snippets below.\n"
+        "Cite sources using bracketed references like [1], [2] when stating facts from them.\n"
+        "If the context does not contain sufficient information to answer the question, or if you are unsure, "
+        "you MUST respond ONLY with \"" REFUSAL_INSUFFICIENT_DATA_TOKEN "\".<|im_end|>\n"
+        "<|im_start|>user\n"
+        "Context:\n");
 
     for (int i = 0; i < retrieved_count; i++) {
         char chunk_header[600];
-        snprintf(chunk_header, sizeof(chunk_header), "[Source: %s]\n", retrieved[i].doc_path);
+        snprintf(chunk_header, sizeof(chunk_header), "[%d] %s\n", i + 1, retrieved[i].doc_path);
         size_t needed = strlen(chunk_header) + strlen(retrieved[i].content) + 4;
         if (written + needed >= prompt_cap) {
             prompt_cap = (written + needed) * 2;
@@ -156,9 +161,9 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
 
     char footer[1024];
     snprintf(footer, sizeof(footer),
-             "--- End Context ---\n\n"
-             "Question: %s\n"
-             "Answer: ",
+             "Question: %s<|im_end|>\n"
+             "<|im_start|>assistant\n"
+             "<think>\n\n</think>\n\n",
              question);
     if (written + strlen(footer) + 1 >= prompt_cap) {
         prompt_cap = written + strlen(footer) + 256;
@@ -169,6 +174,7 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
     snprintf(prompt + written, prompt_cap - written, "%s", footer);
 
     /* Tokenize prompt */
+    utf8_sanitize(prompt);
     const struct llama_vocab *vocab = llama_model_get_vocab(ctx->model);
     int prompt_len = (int)strlen(prompt);
     int n_tokens_alloc = prompt_len + 64;
@@ -295,7 +301,9 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
 
             /* Check for stop sequences */
             char *stop_pos = NULL;
-            if ((stop_pos = strstr(out_text, "\nQuestion:")) != NULL ||
+            if ((stop_pos = strstr(out_text, "<|im_end|>")) != NULL ||
+                (stop_pos = strstr(out_text, "<|im_start|>")) != NULL ||
+                (stop_pos = strstr(out_text, "\nQuestion:")) != NULL ||
                 (stop_pos = strstr(out_text, "\nUser:")) != NULL ||
                 (stop_pos = strstr(out_text, "\nHuman:")) != NULL ||
                 (stop_pos = strstr(out_text, "\n---")) != NULL) {
@@ -319,6 +327,16 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
             break;
     }
 
+    /* Strip thinking block if present */
+    char *think_end = strstr(out_text, "</think>");
+    if (think_end) {
+        char *after_think = think_end + 8;
+        while (*after_think && isspace((unsigned char)*after_think)) {
+            after_think++;
+        }
+        memmove(out_text, after_think, strlen(after_think) + 1);
+    }
+
     /* Trim trailing whitespace */
     size_t final_len = strlen(out_text);
     while (final_len > 0 && isspace((unsigned char)out_text[final_len - 1])) {
@@ -336,21 +354,6 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
         mean_conf = 1.0f;
 
     res.confidence = mean_conf;
-
-    /* If model generated a reasoning block (<think>...</think>), extract final response */
-    char *think_end = strstr(out_text, "</think>");
-    if (think_end) {
-        char *answer = think_end + 8;
-        while (*answer && isspace((unsigned char)*answer))
-            answer++;
-        memmove(out_text, answer, strlen(answer) + 1);
-    }
-
-    /* Trim trailing whitespace again after stripping think block */
-    final_len = strlen(out_text);
-    while (final_len > 0 && isspace((unsigned char)out_text[final_len - 1])) {
-        out_text[--final_len] = '\0';
-    }
 
     /* =========================================================================
      * Stage 2 (Generation Refusal)

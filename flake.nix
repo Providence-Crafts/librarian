@@ -21,7 +21,6 @@
         devShells.default = pkgs.mkShell {
           nativeBuildInputs = with pkgs; [
             # Compilers & Toolchains
-            gcc                    # GNU C Compiler
             clang                  # LLVM C Compiler
             llvmPackages.llvm      # LLVM core tools & symbolizer (llvm-symbolizer for ASan traces)
 
@@ -45,15 +44,16 @@
             # Watchers & Workflow Automation
             watchexec              # File watcher for auto-compilation & continuous testing
             entr                   # Unix-philosophy file watcher
+            shaderc                # GLSL shader compiler (glslc) for Vulkan compute
           ];
 
           buildInputs = with pkgs; [
             # Standard C development libraries
-            glibc
-            glibc.static           # Static glibc headers/libs if needed
             zlib                   # Compression library
             openssl                # Cryptography & TLS
             llvmPackages.openmp    # OpenMP support for Clang
+            vulkan-headers         # Vulkan API headers
+            vulkan-loader          # Vulkan ICD loader
           ];
 
           # Environment variables exported inside development shell
@@ -87,6 +87,22 @@
             echo "   make format    -> Auto-format source code with clang-format"
             echo "   make compdb    -> Generate compile_commands.json for clangd LSP"
             echo "   make watch     -> Continuously re-compile & test on file save"
+          '';
+        };
+
+        devShells.windows = pkgs.pkgsCross.mingwW64.mkShell {
+          nativeBuildInputs = [
+            pkgs.gnumake
+            pkgs.cmake
+            pkgs.ninja
+          ];
+          buildInputs = [
+            pkgs.pkgsCross.mingwW64.windows.pthreads
+          ];
+          shellHook = ''
+            echo "⚡ Windows Cross-Compilation Environment (MinGW-w64) Loaded"
+            echo "   • Compiler: $(${pkgs.pkgsCross.mingwW64.stdenv.cc}/bin/x86_64-w64-mingw32-gcc --version | head -n1)"
+            echo "   Run 'make windows' to build bin/librarian.exe"
           '';
         };
       }

@@ -7,11 +7,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 struct embedder_context {
     struct llama_model *model;
     struct llama_context *ctx;
     int dimension;
+    int threads;
 };
 
 void vector_normalize_l2(float *vec, int dim)
@@ -151,6 +158,30 @@ void chunk_list_free(chunk_list_t *list)
     list->count = 0;
 }
 
+static int get_optimal_thread_count(void)
+{
+    long n = 4;
+#if defined(_WIN32)
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo(&sysinfo);
+    n = (long)sysinfo.dwNumberOfProcessors;
+#else
+    n = sysconf(_SC_NPROCESSORS_ONLN);
+#endif
+    if (n <= 1) {
+        return 1;
+    }
+    if (n <= 4) {
+        return (int)(n - 1);
+    }
+    /* Leave 2 to 4 cores for the OS and background programs */
+    int t = (int)(n - 2);
+    if (t > 12) {
+        t = 12; /* Cap at 12 to maintain L3 cache locality */
+    }
+    return t;
+}
+
 embedder_context_t *embedder_init(const char *model_path, int dimension)
 {
     if (!model_path)
@@ -159,17 +190,24 @@ embedder_context_t *embedder_init(const char *model_path, int dimension)
     llama_backend_init();
 
     struct llama_model_params mparams = llama_model_default_params();
+    mparams.n_gpu_layers = 99;
     struct llama_model *model = llama_model_load_from_file(model_path, mparams);
     if (!model) {
         fprintf(stderr, "Failed to load embedding model from %s\n", model_path);
         return NULL;
     }
 
+    int threads = get_optimal_thread_count();
     struct llama_context_params cparams = llama_context_default_params();
     cparams.embeddings = true;
     cparams.pooling_type = LLAMA_POOLING_TYPE_MEAN;
-    cparams.n_ctx = 2048;
+    cparams.n_ctx = 4096;
     cparams.n_batch = 2048;
+    cparams.n_ubatch = 512;
+    cparams.n_seq_max = 16;
+    cparams.kv_unified = true;
+    cparams.n_threads = threads;
+    cparams.n_threads_batch = threads;
 
     struct llama_context *ctx = llama_init_from_model(model, cparams);
     if (!ctx) {
@@ -187,6 +225,7 @@ embedder_context_t *embedder_init(const char *model_path, int dimension)
 
     emb->model = model;
     emb->ctx = ctx;
+    emb->threads = threads;
     int model_dim = llama_model_n_embd_out(model);
     emb->dimension = (model_dim > 0) ? model_dim : dimension;
 
@@ -206,80 +245,260 @@ void embedder_free(embedder_context_t *ctx)
     free(ctx);
 }
 
-int embedder_embed(embedder_context_t *ctx, const char *text, float *out_vec)
+int embedder_get_thread_count(const embedder_context_t *ctx)
 {
-    if (!ctx || !ctx->ctx || !ctx->model || !text || !out_vec)
+    return ctx ? ctx->threads : 1;
+}
+
+void utf8_sanitize(char *str)
+{
+    if (!str) {
+        return;
+    }
+
+    unsigned char *s = (unsigned char *)str;
+    while (*s) {
+        if (*s < 0x80) {
+            /* Standard ASCII: replace non-printable ASCII control chars (except \t, \n, \r) with
+             * space */
+            if (*s < 0x20 && *s != '\t' && *s != '\n' && *s != '\r') {
+                *s = ' ';
+            }
+            s++;
+        } else if (*s >= 0xC2 && *s <= 0xDF) {
+            /* 2-byte sequence: C2..DF followed by 80..BF */
+            if ((s[1] & 0xC0) == 0x80) {
+                s += 2;
+            } else {
+                *s++ = ' ';
+            }
+        } else if (*s == 0xE0) {
+            /* 3-byte sequence: E0 followed by A0..BF, 80..BF */
+            if ((s[1] >= 0xA0 && s[1] <= 0xBF) && ((s[2] & 0xC0) == 0x80)) {
+                s += 3;
+            } else {
+                *s++ = ' ';
+            }
+        } else if (*s >= 0xE1 && *s <= 0xEC) {
+            /* 3-byte sequence: E1..EC followed by two 80..BF */
+            if (((s[1] & 0xC0) == 0x80) && ((s[2] & 0xC0) == 0x80)) {
+                s += 3;
+            } else {
+                *s++ = ' ';
+            }
+        } else if (*s == 0xED) {
+            /* 3-byte sequence: ED followed by 80..9F, 80..BF (excludes UTF-16 surrogates
+             * 0xD800..0xDFFF) */
+            if ((s[1] >= 0x80 && s[1] <= 0x9F) && ((s[2] & 0xC0) == 0x80)) {
+                s += 3;
+            } else {
+                *s++ = ' ';
+            }
+        } else if (*s >= 0xEE && *s <= 0xEF) {
+            /* 3-byte sequence: EE..EF followed by two 80..BF */
+            if (((s[1] & 0xC0) == 0x80) && ((s[2] & 0xC0) == 0x80)) {
+                s += 3;
+            } else {
+                *s++ = ' ';
+            }
+        } else if (*s == 0xF0) {
+            /* 4-byte sequence: F0 followed by 90..BF, 80..BF, 80..BF */
+            if ((s[1] >= 0x90 && s[1] <= 0xBF) && ((s[2] & 0xC0) == 0x80) &&
+                ((s[3] & 0xC0) == 0x80)) {
+                s += 4;
+            } else {
+                *s++ = ' ';
+            }
+        } else if (*s >= 0xF1 && *s <= 0xF3) {
+            /* 4-byte sequence: F1..F3 followed by three 80..BF */
+            if (((s[1] & 0xC0) == 0x80) && ((s[2] & 0xC0) == 0x80) && ((s[3] & 0xC0) == 0x80)) {
+                s += 4;
+            } else {
+                *s++ = ' ';
+            }
+        } else if (*s == 0xF4) {
+            /* 4-byte sequence: F4 followed by 80..8F, 80..BF, 80..BF (excludes codepoints >
+             * 0x10FFFF) */
+            if ((s[1] >= 0x80 && s[1] <= 0x8F) && ((s[2] & 0xC0) == 0x80) &&
+                ((s[3] & 0xC0) == 0x80)) {
+                s += 4;
+            } else {
+                *s++ = ' ';
+            }
+        } else {
+            /* Invalid lead byte: 80..C1, F5..FF */
+            *s++ = ' ';
+        }
+    }
+}
+
+int embedder_embed_batch(embedder_context_t *ctx, const char *const *texts, float **out_vecs,
+                         int count)
+{
+    if (!ctx || !ctx->ctx || !ctx->model || !texts || !out_vecs || count <= 0) {
         return -1;
+    }
 
     const struct llama_vocab *vocab = llama_model_get_vocab(ctx->model);
-    int text_len = (int)strlen(text);
-    int n_tokens_alloc = text_len + 16;
-    if (n_tokens_alloc < 64)
-        n_tokens_alloc = 64;
 
-    llama_token *tokens = malloc(sizeof(llama_token) * (size_t)n_tokens_alloc);
-    if (!tokens)
+    typedef struct {
+        llama_token *tokens;
+        int n_tokens;
+    } token_seq_t;
+
+    token_seq_t *seqs = calloc((size_t)count, sizeof(token_seq_t));
+    if (!seqs) {
         return -1;
+    }
 
-    int n_tokens = llama_tokenize(vocab, text, text_len, tokens, n_tokens_alloc, true, true);
-    if (n_tokens < 0) {
-        n_tokens_alloc = -n_tokens;
-        llama_token *grown = realloc(tokens, sizeof(llama_token) * (size_t)n_tokens_alloc);
-        if (!grown) {
-            free(tokens);
-            return -1;
+    for (int i = 0; i < count; i++) {
+        const char *t = texts[i];
+        if (!t || t[0] == '\0') {
+            seqs[i].tokens = NULL;
+            seqs[i].n_tokens = 0;
+            if (out_vecs[i]) {
+                memset(out_vecs[i], 0, sizeof(float) * (size_t)ctx->dimension);
+            }
+            continue;
         }
-        tokens = grown;
-        n_tokens = llama_tokenize(vocab, text, text_len, tokens, n_tokens_alloc, true, true);
-        if (n_tokens < 0) {
-            free(tokens);
-            return -1;
+
+        char *clean_t = strdup(t);
+        if (!clean_t) {
+            continue;
+        }
+        utf8_sanitize(clean_t);
+
+        int text_len = (int)strlen(clean_t);
+        int alloc_tokens = text_len + 32;
+        if (alloc_tokens < 64) {
+            alloc_tokens = 64;
+        }
+
+        llama_token *toks = malloc(sizeof(llama_token) * (size_t)alloc_tokens);
+        if (!toks) {
+            free(clean_t);
+            continue;
+        }
+
+        int n = llama_tokenize(vocab, clean_t, text_len, toks, alloc_tokens, true, true);
+        if (n < 0) {
+            alloc_tokens = -n;
+            llama_token *grown = realloc(toks, sizeof(llama_token) * (size_t)alloc_tokens);
+            if (grown) {
+                toks = grown;
+                n = llama_tokenize(vocab, clean_t, text_len, toks, alloc_tokens, true, true);
+            }
+        }
+        free(clean_t);
+
+        if (n > 0) {
+            seqs[i].tokens = toks;
+            seqs[i].n_tokens = n;
+        } else {
+            free(toks);
+            seqs[i].tokens = NULL;
+            seqs[i].n_tokens = 0;
+            if (out_vecs[i]) {
+                memset(out_vecs[i], 0, sizeof(float) * (size_t)ctx->dimension);
+            }
         }
     }
 
-    if (n_tokens == 0) {
-        free(tokens);
-        memset(out_vec, 0, sizeof(float) * (size_t)ctx->dimension);
-        return 0;
-    }
+    /* Process sequences in parallel batches up to 2048 tokens and 16 sequences */
+    int seq_start = 0;
+    while (seq_start < count) {
+        int seq_count = 0;
+        int total_tokens = 0;
 
-    /* Clear memory states before new sequence */
-    llama_memory_clear(llama_get_memory(ctx->ctx), true);
+        while (seq_start + seq_count < count && seq_count < 16) {
+            int n_tok = seqs[seq_start + seq_count].n_tokens;
+            if (n_tok <= 0) {
+                seq_count++;
+                continue;
+            }
+            if (n_tok > 2000) {
+                n_tok = 2000;
+                seqs[seq_start + seq_count].n_tokens = 2000;
+            }
+            if (total_tokens + n_tok > 2048 && seq_count > 0) {
+                break;
+            }
+            total_tokens += n_tok;
+            seq_count++;
+        }
 
-    struct llama_batch batch = llama_batch_init(n_tokens, 0, 1);
-    for (int i = 0; i < n_tokens; i++) {
-        batch.token[i] = tokens[i];
-        batch.pos[i] = i;
-        batch.n_seq_id[i] = 1;
-        batch.seq_id[i][0] = 0;
-        batch.logits[i] = true;
-    }
-    batch.n_tokens = n_tokens;
+        if (total_tokens == 0) {
+            for (int s = 0; s < seq_count; s++) {
+                int seq_idx = seq_start + s;
+                if (out_vecs[seq_idx]) {
+                    memset(out_vecs[seq_idx], 0, sizeof(float) * (size_t)ctx->dimension);
+                }
+            }
+            seq_start += seq_count;
+            continue;
+        }
 
-    int rc = llama_decode(ctx->ctx, batch);
-    free(tokens);
+        llama_memory_clear(llama_get_memory(ctx->ctx), true);
 
-    if (rc != 0) {
+        struct llama_batch batch = llama_batch_init(total_tokens, 0, seq_count);
+        int tok_idx = 0;
+        for (int s = 0; s < seq_count; s++) {
+            int seq_idx = seq_start + s;
+            int n_tok = seqs[seq_idx].n_tokens;
+            if (n_tok <= 0) {
+                continue;
+            }
+            for (int t = 0; t < n_tok; t++) {
+                batch.token[tok_idx] = seqs[seq_idx].tokens[t];
+                batch.pos[tok_idx] = t;
+                batch.n_seq_id[tok_idx] = 1;
+                batch.seq_id[tok_idx][0] = s;
+                batch.logits[tok_idx] = true;
+                tok_idx++;
+            }
+        }
+        batch.n_tokens = tok_idx;
+
+        int rc = llama_decode(ctx->ctx, batch);
+        if (rc == 0) {
+            for (int s = 0; s < seq_count; s++) {
+                int seq_idx = seq_start + s;
+                if (!out_vecs[seq_idx]) {
+                    continue;
+                }
+                if (seqs[seq_idx].n_tokens <= 0) {
+                    memset(out_vecs[seq_idx], 0, sizeof(float) * (size_t)ctx->dimension);
+                    continue;
+                }
+                const float *emb = llama_get_embeddings_seq(ctx->ctx, s);
+                if (emb) {
+                    memcpy(out_vecs[seq_idx], emb, sizeof(float) * (size_t)ctx->dimension);
+                    vector_normalize_l2(out_vecs[seq_idx], ctx->dimension);
+                } else {
+                    memset(out_vecs[seq_idx], 0, sizeof(float) * (size_t)ctx->dimension);
+                }
+            }
+        } else {
+            for (int s = 0; s < seq_count; s++) {
+                int seq_idx = seq_start + s;
+                if (out_vecs[seq_idx]) {
+                    memset(out_vecs[seq_idx], 0, sizeof(float) * (size_t)ctx->dimension);
+                }
+            }
+        }
         llama_batch_free(batch);
-        return -1;
+        seq_start += seq_count;
     }
 
-    const float *emb = llama_get_embeddings_seq(ctx->ctx, 0);
-    if (!emb) {
-        emb = llama_get_embeddings_ith(ctx->ctx, -1);
+    for (int i = 0; i < count; i++) {
+        free(seqs[i].tokens);
     }
-    if (!emb) {
-        emb = llama_get_embeddings(ctx->ctx);
-    }
+    free(seqs);
 
-    if (!emb) {
-        llama_batch_free(batch);
-        return -1;
-    }
-
-    memcpy(out_vec, emb, sizeof(float) * (size_t)ctx->dimension);
-    vector_normalize_l2(out_vec, ctx->dimension);
-
-    llama_batch_free(batch);
     return 0;
+}
+
+int embedder_embed(embedder_context_t *ctx, const char *text, float *out_vec)
+{
+    return embedder_embed_batch(ctx, &text, &out_vec, 1);
 }

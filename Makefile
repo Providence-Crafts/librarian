@@ -39,6 +39,7 @@ INCLUDES = \
 	-isystem $(VENDOR_DIR)/sqlite \
 	-isystem $(VENDOR_DIR)/sqlite-vec \
 	-isystem $(VENDOR_DIR)/tomlc99 \
+	-isystem $(VENDOR_DIR)/miniz \
 	-isystem $(VENDOR_DIR)/llama.cpp/include \
 	-isystem $(VENDOR_DIR)/llama.cpp/ggml/include
 
@@ -46,7 +47,8 @@ INCLUDES = \
 VENDOR_OBJS = \
 	$(BUILD_DIR)/vendor/sqlite3.o \
 	$(BUILD_DIR)/vendor/sqlite-vec.o \
-	$(BUILD_DIR)/vendor/toml.o
+	$(BUILD_DIR)/vendor/toml.o \
+	$(BUILD_DIR)/vendor/miniz.o
 
 LLAMA_BUILD_DIR = $(VENDOR_DIR)/llama.cpp/build
 LLAMA_LIBS = \
@@ -56,6 +58,28 @@ LLAMA_LIBS = \
 	$(LLAMA_BUILD_DIR)/ggml/src/libggml-cpu.a
 
 SYS_LIBS = -lstdc++ -lm -lpthread -ldl -fopenmp
+
+# Vulkan backend support
+ifneq ($(wildcard $(LLAMA_BUILD_DIR)/ggml/src/ggml-vulkan/libggml-vulkan.a),)
+# 1. Try pkg-config
+VULKAN_LDFLAGS ?= $(shell pkg-config --libs vulkan 2>/dev/null)
+# 2. Try direct compiler link test
+ifeq ($(strip $(VULKAN_LDFLAGS)),)
+VULKAN_LDFLAGS := $(shell $(CC) -lvulkan -x c -shared /dev/null -o /dev/null 2>/dev/null && echo "-lvulkan")
+endif
+# 3. Fallback for NixOS outside nix develop: search /nix/store for vulkan-loader
+ifeq ($(strip $(VULKAN_LDFLAGS)),)
+NIX_VULKAN_DIR := $(lastword $(sort $(wildcard /nix/store/*-vulkan-loader-*/lib)))
+ifneq ($(NIX_VULKAN_DIR),)
+VULKAN_LDFLAGS := -L$(NIX_VULKAN_DIR) -Wl,-rpath,$(NIX_VULKAN_DIR) -lvulkan
+endif
+endif
+
+ifneq ($(strip $(VULKAN_LDFLAGS)),)
+LLAMA_LIBS += $(LLAMA_BUILD_DIR)/ggml/src/ggml-vulkan/libggml-vulkan.a
+SYS_LIBS += $(VULKAN_LDFLAGS)
+endif
+endif
 
 # Application sources & objects
 SRCS = $(wildcard $(SRC_DIR)/*.c)
@@ -73,7 +97,7 @@ LDFLAGS :=
 # Vendor compile flags (relaxed warnings for 3rd-party code)
 VENDOR_CFLAGS = -std=c99 -O3 -isystem $(VENDOR_DIR)/sqlite -isystem $(VENDOR_DIR)/sqlite-vec -isystem $(VENDOR_DIR)/tomlc99 -DSQLITE_THREADSAFE=1 -DSQLITE_ENABLE_NORMALIZE -DSQLITE_ENABLE_FTS5 $(DEFINES)
 
-.PHONY: all clean release debug asan tsan test valgrind tidy cppcheck format compdb watch help
+.PHONY: all clean release debug asan tsan test valgrind tidy cppcheck format compdb watch windows help
 
 all: release
 
@@ -95,6 +119,58 @@ tsan: CFLAGS = $(STD) $(WARNING_FLAGS) $(INCLUDES) $(DEFINES) -fsanitize=thread 
 tsan: LDFLAGS += -fsanitize=thread
 tsan: $(BIN_DIR)/$(TARGET_NAME)
 
+# Windows MinGW Cross-Compilation Target
+WIN_CC ?= x86_64-w64-mingw32-gcc
+WIN_CXX ?= x86_64-w64-mingw32-g++
+WIN_BUILD_DIR = $(BUILD_DIR)/win
+WIN_OBJS = $(patsubst $(SRC_DIR)/%.c, $(WIN_BUILD_DIR)/%.o, $(SRCS))
+WIN_VENDOR_OBJS = \
+	$(WIN_BUILD_DIR)/vendor/sqlite3.o \
+	$(WIN_BUILD_DIR)/vendor/sqlite-vec.o \
+	$(WIN_BUILD_DIR)/vendor/toml.o \
+	$(WIN_BUILD_DIR)/vendor/miniz.o
+WIN_LLAMA_DIR = $(VENDOR_DIR)/llama.cpp/build-win
+WIN_LLAMA_LIBS = \
+	$(WIN_LLAMA_DIR)/src/libllama.a \
+	$(WIN_LLAMA_DIR)/ggml/src/ggml.a \
+	$(WIN_LLAMA_DIR)/ggml/src/ggml-base.a \
+	$(WIN_LLAMA_DIR)/ggml/src/ggml-cpu.a
+
+windows: $(BIN_DIR)/$(TARGET_NAME).exe
+
+$(BIN_DIR)/$(TARGET_NAME).exe: $(WIN_OBJS) $(WIN_VENDOR_OBJS) $(WIN_LLAMA_LIBS) | $(BIN_DIR)
+	$(WIN_CC) $(WIN_OBJS) $(WIN_VENDOR_OBJS) $(WIN_LLAMA_LIBS) -o $@ -lstdc++ -lm -lpthread
+
+$(WIN_BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(WIN_BUILD_DIR)
+	$(WIN_CC) $(STD) $(WARNING_FLAGS) $(INCLUDES) $(DEFINES) -O3 -DNDEBUG -MMD -MP -c $< -o $@
+
+$(WIN_BUILD_DIR)/vendor/sqlite3.o: $(VENDOR_DIR)/sqlite/sqlite3.c | $(WIN_BUILD_DIR)/vendor
+	$(WIN_CC) $(VENDOR_CFLAGS) -c $< -o $@
+
+$(WIN_BUILD_DIR)/vendor/sqlite-vec.o: $(VENDOR_DIR)/sqlite-vec/sqlite-vec.c | $(WIN_BUILD_DIR)/vendor
+	$(WIN_CC) $(VENDOR_CFLAGS) -c $< -o $@
+
+$(WIN_BUILD_DIR)/vendor/toml.o: $(VENDOR_DIR)/tomlc99/toml.c | $(WIN_BUILD_DIR)/vendor
+	$(WIN_CC) $(VENDOR_CFLAGS) -c $< -o $@
+
+$(WIN_BUILD_DIR)/vendor/miniz.o: $(VENDOR_DIR)/miniz/miniz_all.c | $(WIN_BUILD_DIR)/vendor
+	$(WIN_CC) $(VENDOR_CFLAGS) -I$(VENDOR_DIR)/miniz -c $< -o $@
+
+$(WIN_LLAMA_LIBS):
+	@mkdir -p $(WIN_LLAMA_DIR)
+	cmake -B $(WIN_LLAMA_DIR) -S $(VENDOR_DIR)/llama.cpp -G Ninja \
+	  -DCMAKE_SYSTEM_NAME=Windows \
+	  -DCMAKE_C_COMPILER=$(WIN_CC) \
+	  -DCMAKE_CXX_COMPILER=$(WIN_CXX) \
+	  -DGGML_BUILD_EXAMPLES=OFF \
+	  -DGGML_BUILD_TESTS=OFF \
+	  -DLLAMA_BUILD_EXAMPLES=OFF \
+	  -DLLAMA_BUILD_TESTS=OFF \
+	  -DLLAMA_BUILD_SERVER=OFF \
+	  -DGGML_VULKAN=OFF \
+	  -DBUILD_SHARED_LIBS=OFF
+	ninja -C $(WIN_LLAMA_DIR) llama ggml ggml-base ggml-cpu
+
 $(BIN_DIR)/$(TARGET_NAME): $(OBJS) $(VENDOR_OBJS) $(LLAMA_LIBS) | $(BIN_DIR)
 	$(CC) $(OBJS) $(VENDOR_OBJS) $(LLAMA_LIBS) -o $@ $(LDFLAGS) $(SYS_LIBS)
 
@@ -112,6 +188,9 @@ $(BUILD_DIR)/vendor/sqlite-vec.o: $(VENDOR_DIR)/sqlite-vec/sqlite-vec.c | $(BUIL
 $(BUILD_DIR)/vendor/toml.o: $(VENDOR_DIR)/tomlc99/toml.c | $(BUILD_DIR)/vendor
 	$(CC) $(VENDOR_CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/vendor/miniz.o: $(VENDOR_DIR)/miniz/miniz_all.c | $(BUILD_DIR)/vendor
+	$(CC) $(VENDOR_CFLAGS) -I$(VENDOR_DIR)/miniz -c $< -o $@
+
 # Header dependencies
 -include $(OBJS:.o=.d)
 -include $(TEST_OBJS:.o=.d)
@@ -122,7 +201,7 @@ $(BUILD_DIR)/vendor/toml.o: $(VENDOR_DIR)/tomlc99/toml.c | $(BUILD_DIR)/vendor
 
 test: $(BUILD_DIR)/tests/test_runner
 	@echo "\n🧪 Running test suite..."
-	@ASAN_OPTIONS="detect_leaks=1:abort_on_error=1" ./$(BUILD_DIR)/tests/test_runner
+	@ASAN_OPTIONS="detect_leaks=1:abort_on_error=1" LSAN_OPTIONS="suppressions=lsan.supp" ./$(BUILD_DIR)/tests/test_runner
 
 $(BUILD_DIR)/tests/test_runner: LDFLAGS += -fsanitize=address,undefined
 $(BUILD_DIR)/tests/test_runner: $(filter-out $(BUILD_DIR)/main.o, $(OBJS)) $(TEST_OBJS) $(VENDOR_OBJS) $(LLAMA_LIBS) | $(BUILD_DIR)/tests
@@ -175,14 +254,14 @@ watch:
 # Housekeeping
 # ------------------------------------------------------------------------------
 
-$(BUILD_DIR) $(BIN_DIR) $(BUILD_DIR)/tests $(BUILD_DIR)/vendor:
+$(BUILD_DIR) $(BIN_DIR) $(BUILD_DIR)/tests $(BUILD_DIR)/vendor $(WIN_BUILD_DIR) $(WIN_BUILD_DIR)/vendor:
 	mkdir -p $@
 
 clean:
-	rm -rf $(BUILD_DIR)/*.o $(BUILD_DIR)/*.d $(BUILD_DIR)/tests $(BIN_DIR) compile_commands.json
+	rm -rf $(BUILD_DIR)/*.o $(BUILD_DIR)/*.d $(BUILD_DIR)/tests $(BUILD_DIR)/win $(BIN_DIR) compile_commands.json
 
 distclean: clean
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) $(WIN_LLAMA_DIR)
 
 help:
 	@echo "Librarian Build System"
@@ -197,3 +276,5 @@ help:
 	@echo "  make format     - Auto-format code with clang-format"
 	@echo "  make compdb     - Generate compile_commands.json for clangd"
 	@echo "  make watch      - Automatically rerun tests on change"
+	@echo "  make windows    - Cross-compile Windows binary (bin/librarian.exe)"
+

@@ -2,6 +2,7 @@
 #define LIBRARIAN_CONFIG_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #define CONFIG_DEFAULT_PATH "librarian.toml"
 
@@ -13,6 +14,8 @@ typedef struct {
     char embed_model_path[512];
     int embed_dimension;
     float similarity_threshold;
+    int chunk_size_words;
+    int chunk_overlap_words;
 
     /* Generator settings */
     char gen_model_path[512];
@@ -21,7 +24,9 @@ typedef struct {
 } librarian_config_t;
 
 void config_default(librarian_config_t *cfg);
+int config_get_default_paths(char *config_path, size_t cfg_sz, char *data_dir, size_t data_sz);
 int config_load(const char *path, librarian_config_t *cfg);
+int config_save(const char *path, const librarian_config_t *cfg);
 void config_print(const librarian_config_t *cfg);
 
 #endif /* LIBRARIAN_CONFIG_H */

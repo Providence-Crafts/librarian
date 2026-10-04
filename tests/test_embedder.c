@@ -66,6 +66,8 @@ const char *test_embedder_model(void)
     embedder_context_t *emb = embedder_init(model_path, 1024);
     mu_assert("embedder_init failed", emb != NULL);
 
+    mu_assert("thread count should be >= 1", embedder_get_thread_count(emb) >= 1);
+
     float vec[1024] = {0};
     int rc = embedder_embed(emb, "Libraries are quiet places filled with books.", vec);
     mu_assert("embedder_embed failed", rc == 0);
@@ -76,6 +78,24 @@ const char *test_embedder_model(void)
     }
     float norm = sqrtf(sum_sq);
     mu_assert("embedding vector norm should be ~1.0", fabsf(norm - 1.0f) < 1e-3f);
+
+    /* Test batch embedding */
+    const char *batch_texts[2] = {"First batch document chunk about computer science.",
+                                  "Second batch document chunk about mathematics."};
+    float bvec1[1024] = {0};
+    float bvec2[1024] = {0};
+    float *bvecs[2] = {bvec1, bvec2};
+
+    rc = embedder_embed_batch(emb, batch_texts, bvecs, 2);
+    mu_assert("embedder_embed_batch failed", rc == 0);
+
+    float bsum1 = 0.0f, bsum2 = 0.0f;
+    for (int i = 0; i < 1024; i++) {
+        bsum1 += bvec1[i] * bvec1[i];
+        bsum2 += bvec2[i] * bvec2[i];
+    }
+    mu_assert("batch vec1 norm should be ~1.0", fabsf(sqrtf(bsum1) - 1.0f) < 1e-3f);
+    mu_assert("batch vec2 norm should be ~1.0", fabsf(sqrtf(bsum2) - 1.0f) < 1e-3f);
 
     embedder_free(emb);
     return NULL;

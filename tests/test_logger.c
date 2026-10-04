@@ -18,6 +18,15 @@ const char *test_logger_lifecycle(void)
     logger_set_level(LOG_LEVEL_INFO);
     mu_assert("logger_get_level should be INFO", logger_get_level() == LOG_LEVEL_INFO);
 
+    mu_assert("console echo default should be false", !logger_get_console_echo());
+    logger_set_console_echo(true);
+    mu_assert("console echo should be true after enabling", logger_get_console_echo());
+    mu_assert("level should be DEBUG when console echo is enabled",
+              logger_get_level() == LOG_LEVEL_DEBUG);
+    logger_set_console_echo(false);
+    mu_assert("console echo should be false after disabling", !logger_get_console_echo());
+    logger_set_level(LOG_LEVEL_INFO);
+
     logger_debug("This debug message should be filtered out");
     logger_info("Info message: %s %d", "hello", 123);
     logger_warn("Warning condition: %s", "check disk");

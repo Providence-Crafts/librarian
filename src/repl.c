@@ -5,15 +5,30 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
-#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
 #include <sys/stat.h>
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <direct.h>
+#include <windows.h>
+#include <io.h>
+#ifndef STDIN_FILENO
+#define STDIN_FILENO 0
+#define STDOUT_FILENO 1
+#endif
+#define isatty _isatty
+#define fileno _fileno
+#define mkdir_portable(p) _mkdir(p)
+#else
+#include <poll.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
+#define mkdir_portable(p) mkdir(p, 0755)
+#endif
 
 #define REPL_LINE_CAP_INIT 256
 #define REPL_HISTORY_CAP_INIT 64
@@ -69,10 +84,18 @@ struct repl_context {
 
     /* Terminal state */
     bool is_raw;
+#if !defined(_WIN32)
     struct termios orig_termios;
+#endif
     int tty_fd;
 };
 
+#if defined(_WIN32)
+static void disable_raw_mode(repl_context_t *repl)
+{
+    (void)repl;
+}
+#else
 static volatile sig_atomic_t g_in_raw_mode = 0;
 static struct termios g_saved_termios;
 static int g_saved_fd = -1;
@@ -145,7 +168,9 @@ static void disable_raw_mode(repl_context_t *repl)
         repl->is_raw = false;
     }
 }
+#endif
 
+#if !defined(_WIN32)
 static repl_key_t read_key(int fd, char *out_char)
 {
     unsigned char c = 0;
@@ -373,13 +398,12 @@ static void generate_candidates(const char *buf, size_t cursor, candidate_list_t
                     dlen = sizeof(fs_dir) - 1;
                 }
                 strncpy(fs_dir, arg, dlen);
-                fs_dir[dlen] = '\0';
-                strncpy(disp_prefix, fs_dir, sizeof(disp_prefix) - 1);
-                strncpy(file_prefix, last_slash + 1, sizeof(file_prefix) - 1);
+                snprintf(disp_prefix, sizeof(disp_prefix), "%s", fs_dir);
+                snprintf(file_prefix, sizeof(file_prefix), "%s", last_slash + 1);
             } else {
                 snprintf(fs_dir, sizeof(fs_dir), ".");
                 disp_prefix[0] = '\0';
-                strncpy(file_prefix, arg, sizeof(file_prefix) - 1);
+                snprintf(file_prefix, sizeof(file_prefix), "%s", arg);
             }
         }
         file_prefix[sizeof(file_prefix) - 1] = '\0';
@@ -437,8 +461,9 @@ static void generate_candidates(const char *buf, size_t cursor, candidate_list_t
     const char *prefix = buf + word_start;
     size_t prefix_len = (cursor > word_start) ? (cursor - word_start) : 0;
 
-    static const char *default_commands[] = {"/help",   "/ingest ", "/stats",
-                                             "/config", "/clear",   "/exit"};
+    static const char *default_commands[] = {"/help",   "/docs",   "/chunks ", "/ingest ",
+                                             "/stats",  "/config", "/setup",   "/reset",
+                                             "/reload", "/debug",  "/clear",   "/exit"};
     static const size_t num_default = sizeof(default_commands) / sizeof(default_commands[0]);
 
     if (prefix_len <= 1) {
@@ -451,8 +476,10 @@ static void generate_candidates(const char *buf, size_t cursor, candidate_list_t
         }
     } else {
         /* Specific prefix typed: check all commands including /quit */
-        static const char *all_commands[] = {"/help",  "/ingest ", "/stats", "/config",
-                                             "/clear", "/exit",    "/quit"};
+        static const char *all_commands[] = {"/help",   "/docs",   "/chunks ", "/ingest ",
+                                             "/stats",  "/config", "/setup",   "/reset",
+                                             "/reload", "/debug",  "/clear",   "/exit",
+                                             "/quit"};
         static const size_t num_all = sizeof(all_commands) / sizeof(all_commands[0]);
 
         for (size_t i = 0; i < num_all; i++) {
@@ -500,10 +527,20 @@ static size_t render_completion_menu(const candidate_list_t *list, size_t select
     }
 
     int term_w = 80;
+#if defined(_WIN32)
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
+        int w = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+        if (w > 20) {
+            term_w = w;
+        }
+    }
+#else
     struct winsize ws;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 20) {
         term_w = ws.ws_col;
     }
+#endif
 
     size_t max_len = 0;
     for (size_t i = 0; i < list->count; i++) {
@@ -609,6 +646,7 @@ static size_t menu_move_up(size_t cur, size_t count, size_t cols)
     }
     return target;
 }
+#endif
 
 static void repl_history_push(repl_context_t *repl, const char *line)
 {
@@ -708,9 +746,12 @@ void repl_history_add(repl_context_t *repl, const char *line)
         strncpy(dir_buf, repl->history_path, sizeof(dir_buf) - 1);
         dir_buf[sizeof(dir_buf) - 1] = '\0';
         char *slash = strrchr(dir_buf, '/');
+#if defined(_WIN32)
+        if (!slash) slash = strrchr(dir_buf, '\\');
+#endif
         if (slash) {
             *slash = '\0';
-            mkdir(dir_buf, 0755);
+            mkdir_portable(dir_buf);
         }
 
         FILE *fp = fopen(repl->history_path, "a");
@@ -726,6 +767,29 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
     if (!repl)
         return NULL;
 
+#if defined(_WIN32)
+    printf("%s", prompt);
+    fflush(stdout);
+    char buf[4096];
+    if (!fgets(buf, sizeof(buf), stdin)) {
+        return NULL;
+    }
+    size_t l = strlen(buf);
+    while (l > 0 && (buf[l - 1] == '\n' || buf[l - 1] == '\r')) {
+        buf[--l] = '\0';
+    }
+    if (repl->line_cap <= l) {
+        char *grown = (char *)realloc(repl->line_buf, l + 64);
+        if (!grown)
+            return NULL;
+        repl->line_buf = grown;
+        repl->line_cap = l + 64;
+    }
+    memcpy(repl->line_buf, buf, l + 1);
+    repl->line_len = l;
+    repl->cursor = l;
+    return repl->line_buf;
+#else
     /* Fallback for non-interactive / piped environments */
     if (!isatty(repl->tty_fd)) {
         printf("%s", prompt);
@@ -1083,6 +1147,7 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
             redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
         }
     }
+#endif
 }
 
 size_t repl_history_count(const repl_context_t *repl)

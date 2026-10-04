@@ -1,0 +1,3 @@
+# Suppress driver-level leaks in external Mesa Vulkan driver
+leak:libvulkan_radeon.so
+leak:mesa_cache_db

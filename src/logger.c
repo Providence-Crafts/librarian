@@ -10,13 +10,29 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <direct.h>
+#include <process.h>
+#define mkdir_portable(p) _mkdir(p)
+#define getpid _getpid
+static inline struct tm *portable_localtime_r(const time_t *timer, struct tm *buf)
+{
+    localtime_s(buf, timer);
+    return buf;
+}
+#define localtime_r(t, b) portable_localtime_r(t, b)
+#else
 #include <unistd.h>
+#define mkdir_portable(p) mkdir(p, 0755)
+#endif
 
 #define LOGGER_MAX_FILE_SIZE (10L * 1024L * 1024L) /* 10 MB limit */
 
 static FILE *g_log_fp = NULL;
 static char g_log_path[512] = {0};
 static log_level_t g_min_level = LOG_LEVEL_DEBUG;
+static bool g_console_echo = false;
 static pthread_mutex_t g_log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static const char *level_to_string(log_level_t level)
@@ -62,6 +78,10 @@ static void librarian_llama_log_callback(enum ggml_log_level level, const char *
     }
 
     (void)pthread_mutex_lock(&g_log_mutex);
+    if (g_console_echo) {
+        fputs(text, stderr);
+        (void)fflush(stderr);
+    }
     if (g_log_fp) {
         logger_check_rotate_locked();
         if (g_log_fp) {
@@ -93,9 +113,12 @@ int logger_init(const char *log_path)
     strncpy(dir_buf, log_path, sizeof(dir_buf) - 1);
     dir_buf[sizeof(dir_buf) - 1] = '\0';
     char *last_slash = strrchr(dir_buf, '/');
+#if defined(_WIN32)
+    if (!last_slash) last_slash = strrchr(dir_buf, '\\');
+#endif
     if (last_slash) {
         *last_slash = '\0';
-        (void)mkdir(dir_buf, 0755);
+        (void)mkdir_portable(dir_buf);
     }
 
     g_log_fp = fopen(g_log_path, "a");
@@ -138,6 +161,24 @@ log_level_t logger_get_level(void)
     return lvl;
 }
 
+void logger_set_console_echo(bool enable)
+{
+    (void)pthread_mutex_lock(&g_log_mutex);
+    g_console_echo = enable;
+    if (enable) {
+        g_min_level = LOG_LEVEL_DEBUG;
+    }
+    (void)pthread_mutex_unlock(&g_log_mutex);
+}
+
+bool logger_get_console_echo(void)
+{
+    (void)pthread_mutex_lock(&g_log_mutex);
+    bool echo = g_console_echo;
+    (void)pthread_mutex_unlock(&g_log_mutex);
+    return echo;
+}
+
 void logger_log_level(log_level_t level, const char *fmt, ...)
 {
     if (level < g_min_level || !fmt) {
@@ -145,6 +186,17 @@ void logger_log_level(log_level_t level, const char *fmt, ...)
     }
 
     (void)pthread_mutex_lock(&g_log_mutex);
+
+    if (g_console_echo) {
+        fprintf(stderr, "\x1b[38;2;98;114;164m[%s] \x1b[0m", level_to_string(level));
+        va_list args_console;
+        va_start(args_console, fmt);
+        vfprintf(stderr, fmt, args_console);
+        va_end(args_console);
+        fputc('\n', stderr);
+        (void)fflush(stderr);
+    }
+
     if (!g_log_fp) {
         (void)pthread_mutex_unlock(&g_log_mutex);
         return;

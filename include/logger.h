@@ -19,6 +19,8 @@ typedef enum {
 int logger_init(const char *log_path);
 void logger_set_level(log_level_t level);
 log_level_t logger_get_level(void);
+void logger_set_console_echo(bool enable);
+bool logger_get_console_echo(void);
 
 void logger_log_level(log_level_t level, const char *fmt, ...) ATTR_LOGGER_PRINTF(2, 3);
 void logger_log(const char *fmt, ...) ATTR_LOGGER_PRINTF(1, 2);

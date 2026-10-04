@@ -1041,8 +1041,14 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
             }
 
             if (history_index == -1) {
-                /* Save current input to scratch buffer */
-                strncpy(repl->scratch_buf, repl->line_buf, repl->line_cap - 1);
+                /* Save current input; line_buf may have outgrown scratch_buf */
+                char *grown = (char *)realloc(repl->scratch_buf, repl->line_cap);
+                if (grown) {
+                    repl->scratch_buf = grown;
+                    memcpy(repl->scratch_buf, repl->line_buf, repl->line_len + 1);
+                } else {
+                    repl->scratch_buf[0] = '\0';
+                }
                 history_index = (int)repl->history_count - 1;
             } else if (history_index > 0) {
                 history_index--;
@@ -1057,9 +1063,11 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
                     repl->line_cap = elen + 64;
                 }
             }
-            memcpy(repl->line_buf, entry, elen + 1);
-            repl->line_len = elen;
-            repl->cursor = elen;
+            if (elen < repl->line_cap) {
+                memcpy(repl->line_buf, entry, elen + 1);
+                repl->line_len = elen;
+                repl->cursor = elen;
+            }
             redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
             continue;
         }
@@ -1081,9 +1089,11 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
                         repl->line_cap = ncap;
                     }
                 }
-                memcpy(repl->line_buf, entry, elen + 1);
-                repl->line_len = elen;
-                repl->cursor = elen;
+                if (elen < repl->line_cap) {
+                    memcpy(repl->line_buf, entry, elen + 1);
+                    repl->line_len = elen;
+                    repl->cursor = elen;
+                }
             } else {
                 history_index = -1;
                 size_t slen = strlen(repl->scratch_buf);
@@ -1117,10 +1127,13 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
                         repl->line_cap = ncap;
                     }
                 }
-                memcpy(repl->line_buf + from, choice, clen);
-                repl->line_len = from + clen;
-                repl->line_buf[repl->line_len] = '\0';
-                repl->cursor = repl->line_len;
+                /* realloc may have failed: insert only when it fits */
+                if (needed < repl->line_cap) {
+                    memcpy(repl->line_buf + from, choice, clen);
+                    repl->line_len = from + clen;
+                    repl->line_buf[repl->line_len] = '\0';
+                    repl->cursor = repl->line_len;
+                }
                 candidate_list_free(&candidates);
                 redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
             } else {
@@ -1139,10 +1152,12 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
                             repl->line_cap = ncap;
                         }
                     }
-                    memcpy(repl->line_buf + from, candidates.items[0].insert_text, common_len);
-                    repl->line_len = from + common_len;
-                    repl->line_buf[repl->line_len] = '\0';
-                    repl->cursor = repl->line_len;
+                    if (needed < repl->line_cap) {
+                        memcpy(repl->line_buf + from, candidates.items[0].insert_text, common_len);
+                        repl->line_len = from + common_len;
+                        repl->line_buf[repl->line_len] = '\0';
+                        repl->cursor = repl->line_len;
+                    }
                 }
 
                 /* Open completion menu */

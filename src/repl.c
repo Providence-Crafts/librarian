@@ -1,5 +1,6 @@
 #include "repl.h"
 
+#include "theme.h"
 #include "ui.h"
 
 #include <ctype.h>
@@ -603,21 +604,24 @@ static size_t render_completion_menu(const candidate_list_t *list, size_t select
             bool is_dir = list->items[idx].is_dir;
 
             if (idx == selected) {
-                /* Selected: Vibrant purple pill highlight */
-                printf("\x1b[38;2;18;18;24;48;2;189;147;249;1m %-*s \x1b[0m", (int)(cellw - 2),
-                       disp);
+                /* Selected: the [menu] selected style, a pill by default */
+                printf("%s %-*s %s", theme_sgr(THEME_SELECTED), (int)(cellw - 2), disp,
+                       theme_sgr(THEME_RESET));
             } else {
-                /* Unselected: clean gray text (with cyan accent for directories) */
+                /* Unselected: [menu] match, with [menu] detail for directories */
                 if (is_dir) {
-                    printf("\x1b[38;2;139;190;255m  %-*s\x1b[0m", (int)(cellw - 2), disp);
+                    printf("%s  %-*s%s", theme_sgr(THEME_DETAIL), (int)(cellw - 2), disp,
+                           theme_sgr(THEME_RESET));
                 } else {
-                    printf("\x1b[38;2;140;145;165m  %-*s\x1b[0m", (int)(cellw - 2), disp);
+                    printf("%s  %-*s%s", theme_sgr(THEME_MATCH), (int)(cellw - 2), disp,
+                           theme_sgr(THEME_RESET));
                 }
             }
         }
     }
 
-    printf("\r\n\x1b[K\x1b[38;5;244m  (Tab/Arrows: navigate • Enter: select • Esc: cancel)\x1b[0m");
+    printf("\r\n\x1b[K%s  (Tab/Arrows: navigate • Enter: select • Esc: cancel)%s",
+           theme_sgr(THEME_HINT), theme_sgr(THEME_RESET));
     drawn_rows++;
 
     /* Move cursor back up to prompt line */

@@ -1,3 +1,4 @@
+#include "brand.h"
 #include "config.h"
 #include "db.h"
 #include "doc.h"
@@ -5,8 +6,11 @@
 #include "generator.h"
 #include "logger.h"
 #include "pipeline.h"
+#include "plat.h"
 #include "repl.h"
+#include "theme.h"
 #include "ui.h"
+#include "version.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -24,8 +28,6 @@
 #else
 #include <unistd.h>
 #endif
-
-#define LIBRARIAN_VERSION "0.1.0"
 
 static double get_time_sec(void)
 {
@@ -183,9 +185,11 @@ static void run_query_core(db_context_t *db, embedder_context_t *emb, generator_
         ui_clear_status();
         ui_similarity_badge(0.0f, cfg->similarity_threshold);
         ui_confidence_badge(0.0f, true);
-        printf("\n" COLOR_PEACH
-               "Stage 1 Refusal: No matching documents found in knowledge base." COLOR_RESET "\n");
-        printf(COLOR_GRAY "Ingest reference documents using `/ingest <path>`." COLOR_RESET "\n\n");
+        ui_printf("\n" STYLE_PROGRESS
+                  "Stage 1 Refusal: No matching documents found in knowledge base." STYLE_RESET
+                  "\n");
+        ui_printf(STYLE_NOTE "Ingest reference documents using `/ingest <path>`." STYLE_RESET
+                             "\n\n");
         if (results) {
             db_free_results(results, count);
         }
@@ -197,14 +201,14 @@ static void run_query_core(db_context_t *db, embedder_context_t *emb, generator_
         ui_clear_status();
         ui_similarity_badge(results[0].similarity, cfg->similarity_threshold);
         ui_confidence_badge(results[0].similarity, true);
-        printf(
-            "\n" COLOR_PEACH
-            "Stage 1 Refusal: Best match similarity (%.3f) is below threshold (%.3f)." COLOR_RESET
+        ui_printf(
+            "\n" STYLE_PROGRESS
+            "Stage 1 Refusal: Best match similarity (%.3f) is below threshold (%.3f)." STYLE_RESET
             "\n",
             (double)results[0].similarity, (double)cfg->similarity_threshold);
-        printf(COLOR_GRAY
-               "I do not have sufficient relevant documents to answer this question." COLOR_RESET
-               "\n\n");
+        ui_printf(STYLE_NOTE
+                  "I do not have sufficient relevant documents to answer this question." STYLE_RESET
+                  "\n\n");
         db_free_results(results, count);
         return;
     }
@@ -221,15 +225,15 @@ static void run_query_core(db_context_t *db, embedder_context_t *emb, generator_
     ui_confidence_badge(gen_res.confidence, gen_res.is_refusal);
 
     if (gen_res.is_refusal) {
-        printf("\n" COLOR_PEACH "%s" COLOR_RESET "\n", gen_res.refusal_reason);
-        printf(COLOR_GRAY "%s" COLOR_RESET "\n\n", gen_res.text ? gen_res.text : "");
+        ui_printf("\n" STYLE_PROGRESS "%s" STYLE_RESET "\n", gen_res.refusal_reason);
+        ui_printf(STYLE_NOTE "%s" STYLE_RESET "\n\n", gen_res.text ? gen_res.text : "");
     } else {
-        printf("\n" COLOR_MINT "%s" COLOR_RESET "\n\n", gen_res.text ? gen_res.text : "");
+        ui_printf("\n" STYLE_SUCCESS "%s" STYLE_RESET "\n\n", gen_res.text ? gen_res.text : "");
         ui_references(results, count, cfg->similarity_threshold);
     }
 
-    printf(COLOR_GRAY "⏱ Search: %.2fs • Generation: %.2fs • Total: %.2fs\n" COLOR_RESET "\n",
-           t_search - t_start, t_end - t_search, t_end - t_start);
+    ui_printf(STYLE_NOTE "⏱ Search: %.2fs • Generation: %.2fs • Total: %.2fs\n" STYLE_RESET "\n",
+              t_search - t_start, t_end - t_search, t_end - t_start);
 
     generation_result_free(&gen_res);
     db_free_results(results, count);
@@ -237,34 +241,37 @@ static void run_query_core(db_context_t *db, embedder_context_t *emb, generator_
 
 static void show_setup_walkthrough(void)
 {
-    printf("\n" COLOR_LAVENDER COLOR_BOLD "✨ Librarian Quick Start Walkthrough:" COLOR_RESET
-           "\n\n");
-    printf(COLOR_BOLD "1. Ingest your books and notes:" COLOR_RESET "\n");
-    printf("   " COLOR_MINT "librarian ingest ~/Documents/my_library/" COLOR_RESET "\n");
-    printf("   " COLOR_GRAY
-           "Indexes PDF, EPUB, DOCX, ODT, HTML, Markdown, and plain text files.\n" COLOR_RESET);
-    printf("   " COLOR_GRAY "Completely self-contained pure C99 engine with zero runtime "
-           "dependencies.\n\n" COLOR_RESET);
+    ui_printf("\n" STYLE_HEADING "✨ Librarian Quick Start Walkthrough:" STYLE_RESET "\n\n");
+    ui_printf(STYLE_HEADING "1. Ingest your books and notes:" STYLE_RESET "\n");
+    ui_printf("   " STYLE_SUCCESS "librarian ingest ~/Documents/my_library/" STYLE_RESET "\n");
+    ui_printf("   " STYLE_NOTE
+              "Indexes PDF, EPUB, DOCX, ODT, HTML, Markdown, and plain text files.\n" STYLE_RESET);
+    ui_printf("   " STYLE_NOTE "Completely self-contained pure C99 engine with zero runtime "
+              "dependencies.\n\n" STYLE_RESET);
 
-    printf(COLOR_BOLD "2. Search and explore your library:" COLOR_RESET "\n");
-    printf("   " COLOR_MINT "librarian docs" COLOR_RESET "\n");
-    printf("   " COLOR_GRAY "Lists all indexed documents with IDs and chunk counts.\n" COLOR_RESET);
-    printf("   " COLOR_MINT "librarian chunks 1" COLOR_RESET "\n");
-    printf("   " COLOR_GRAY
-           "Inspects the individual chunks and quotes that make up document #1.\n\n" COLOR_RESET);
+    ui_printf(STYLE_HEADING "2. Search and explore your library:" STYLE_RESET "\n");
+    ui_printf("   " STYLE_SUCCESS "librarian docs" STYLE_RESET "\n");
+    ui_printf("   " STYLE_NOTE
+              "Lists all indexed documents with IDs and chunk counts.\n" STYLE_RESET);
+    ui_printf("   " STYLE_SUCCESS "librarian chunks 1" STYLE_RESET "\n");
+    ui_printf(
+        "   " STYLE_NOTE
+        "Inspects the individual chunks and quotes that make up document #1.\n\n" STYLE_RESET);
 
-    printf(COLOR_BOLD "3. Ask questions with verified citations:" COLOR_RESET "\n");
-    printf("   " COLOR_MINT "librarian query \"What is quantum annealing?\"" COLOR_RESET "\n");
-    printf("   " COLOR_GRAY
-           "Synthesizes answers grounded strictly in your indexed library.\n\n" COLOR_RESET);
+    ui_printf(STYLE_HEADING "3. Ask questions with verified citations:" STYLE_RESET "\n");
+    ui_printf("   " STYLE_SUCCESS "librarian query \"What is quantum annealing?\"" STYLE_RESET
+              "\n");
+    ui_printf("   " STYLE_NOTE
+              "Synthesizes answers grounded strictly in your indexed library.\n\n" STYLE_RESET);
 
-    printf(COLOR_BOLD "4. Interactive Chat Session:" COLOR_RESET "\n");
-    printf("   " COLOR_MINT "librarian chat" COLOR_RESET "\n");
-    printf("   " COLOR_GRAY "Interactive shell with auto-completion, live /docs, /chunks, /ingest, "
-           "and /help.\n\n" COLOR_RESET);
+    ui_printf(STYLE_HEADING "4. Interactive Chat Session:" STYLE_RESET "\n");
+    ui_printf("   " STYLE_SUCCESS "librarian chat" STYLE_RESET "\n");
+    ui_printf("   " STYLE_NOTE
+              "Interactive shell with auto-completion, live /docs, /chunks, /ingest, "
+              "and /help.\n\n" STYLE_RESET);
 
-    printf(COLOR_PEACH "💡 Tip: You can re-run this setup anytime with `librarian setup` or "
-                       "`/setup` in chat.\n" COLOR_RESET "\n");
+    ui_printf(STYLE_PROGRESS "💡 Tip: You can re-run this setup anytime with `librarian setup` or "
+                             "`/setup` in chat.\n" STYLE_RESET "\n");
 }
 
 /* Shell out to mkdir and curl. Both arguments come from the user's own config
@@ -313,7 +320,7 @@ static int download_file(const char *url, const char *dest_path)
     free(qurl);
     free(qdest);
 #endif
-    printf(COLOR_BLUE "⬇ Downloading %s..." COLOR_RESET "\n", dest_path);
+    ui_printf(STYLE_INFO "⬇ Downloading %s..." STYLE_RESET "\n", dest_path);
     int rc = system(cmd); /* NOLINT(cert-env33-c) */
     if (rc != 0) {
         ui_error("Download failed (curl exit code %d)", rc);
@@ -324,11 +331,12 @@ static int download_file(const char *url, const char *dest_path)
 
 static int subcmd_setup(librarian_config_t *cfg, bool force)
 {
-    printf(COLOR_LAVENDER COLOR_BOLD
-           "\n╔═══════════════════════════════════════════════════════════════════════╗\n");
+    ui_printf(STYLE_HEADING
+              "\n╔═══════════════════════════════════════════════════════════════════════╗\n");
     printf("║                    Librarian Automated Setup                          ║\n");
-    printf("╚═══════════════════════════════════════════════════════════════════════╝\n" COLOR_RESET
-           "\n");
+    ui_printf(
+        "╚═══════════════════════════════════════════════════════════════════════╝\n" STYLE_RESET
+        "\n");
 
     if (system("curl --version >/dev/null 2>&1") != 0) { /* NOLINT(cert-env33-c) */
         ui_error(
@@ -490,7 +498,7 @@ static int run_query_mode(librarian_config_t *cfg, const char *question)
         return 1;
     }
 
-    printf("\n" COLOR_BOLD "Question: " COLOR_RESET "%s\n", question);
+    ui_printf("\n" STYLE_HEADING "Question: " STYLE_RESET "%s\n", question);
     ui_status("🔍 [searching vector index...]");
 
     double t_start = get_time_sec();
@@ -522,11 +530,12 @@ static int run_query_mode(librarian_config_t *cfg, const char *question)
         ui_clear_status();
         ui_similarity_badge(0.0f, cfg->similarity_threshold);
         ui_confidence_badge(0.0f, true);
-        printf("\n" COLOR_PEACH
-               "Stage 1 Refusal: No matching documents found in knowledge base." COLOR_RESET "\n");
-        printf(COLOR_GRAY
-               "Please ingest reference documents using `librarian ingest <path>`." COLOR_RESET
-               "\n\n");
+        ui_printf("\n" STYLE_PROGRESS
+                  "Stage 1 Refusal: No matching documents found in knowledge base." STYLE_RESET
+                  "\n");
+        ui_printf(STYLE_NOTE
+                  "Please ingest reference documents using `librarian ingest <path>`." STYLE_RESET
+                  "\n\n");
         if (results) {
             db_free_results(results, count);
         }
@@ -540,15 +549,15 @@ static int run_query_mode(librarian_config_t *cfg, const char *question)
         ui_clear_status();
         ui_similarity_badge(results[0].similarity, cfg->similarity_threshold);
         ui_confidence_badge(results[0].similarity, true);
-        printf(
-            "\n" COLOR_PEACH
-            "Stage 1 Refusal: Best match similarity (%.3f) is below threshold (%.3f)." COLOR_RESET
+        ui_printf(
+            "\n" STYLE_PROGRESS
+            "Stage 1 Refusal: Best match similarity (%.3f) is below threshold (%.3f)." STYLE_RESET
             "\n",
             (double)results[0].similarity, (double)cfg->similarity_threshold);
-        printf(COLOR_GRAY
-               "I do not have sufficient relevant documents to answer this question." COLOR_RESET
-               "\n\n");
-        printf(COLOR_GRAY "⏱ Search: %.2fs\n" COLOR_RESET "\n", t_search - t_start);
+        ui_printf(STYLE_NOTE
+                  "I do not have sufficient relevant documents to answer this question." STYLE_RESET
+                  "\n\n");
+        ui_printf(STYLE_NOTE "⏱ Search: %.2fs\n" STYLE_RESET "\n", t_search - t_start);
         db_free_results(results, count);
         embedder_free(emb);
         db_close(db);
@@ -576,15 +585,15 @@ static int run_query_mode(librarian_config_t *cfg, const char *question)
     ui_confidence_badge(gen_res.confidence, gen_res.is_refusal);
 
     if (gen_res.is_refusal) {
-        printf("\n" COLOR_PEACH "%s" COLOR_RESET "\n", gen_res.refusal_reason);
-        printf(COLOR_GRAY "%s" COLOR_RESET "\n\n", gen_res.text ? gen_res.text : "");
+        ui_printf("\n" STYLE_PROGRESS "%s" STYLE_RESET "\n", gen_res.refusal_reason);
+        ui_printf(STYLE_NOTE "%s" STYLE_RESET "\n\n", gen_res.text ? gen_res.text : "");
     } else {
-        printf("\n" COLOR_MINT "%s" COLOR_RESET "\n\n", gen_res.text ? gen_res.text : "");
+        ui_printf("\n" STYLE_SUCCESS "%s" STYLE_RESET "\n\n", gen_res.text ? gen_res.text : "");
         ui_references(results, count, cfg->similarity_threshold);
     }
 
-    printf(COLOR_GRAY "⏱ Search: %.2fs • Generation: %.2fs • Total: %.2fs\n" COLOR_RESET "\n",
-           t_search - t_start, t_end - t_search, t_end - t_start);
+    ui_printf(STYLE_NOTE "⏱ Search: %.2fs • Generation: %.2fs • Total: %.2fs\n" STYLE_RESET "\n",
+              t_search - t_start, t_end - t_search, t_end - t_start);
 
     generation_result_free(&gen_res);
     db_free_results(results, count);
@@ -596,32 +605,34 @@ static int run_query_mode(librarian_config_t *cfg, const char *question)
 
 static void show_repl_help(void)
 {
-    printf("\n" COLOR_LAVENDER COLOR_BOLD "📚 Librarian REPL Commands:" COLOR_RESET "\n");
-    printf("  " COLOR_MINT "/help" COLOR_RESET "            Display this interactive help menu\n");
-    printf("  " COLOR_MINT "/docs [query]" COLOR_RESET
-           "     List indexed documents matching optional pattern\n");
-    printf("  " COLOR_MINT "/chunks <id> [n]" COLOR_RESET
-           "  Inspect chunks belonging to a document\n");
-    printf("  " COLOR_MINT "/ingest <path>" COLOR_RESET
-           "   Ingest a document file or directory recursively\n");
-    printf("  " COLOR_MINT "/stats" COLOR_RESET
-           "           Display vector database document and chunk statistics\n");
-    printf("  " COLOR_MINT "/config" COLOR_RESET
-           "          Display current model thresholds and paths\n");
-    printf("  " COLOR_MINT "/reload" COLOR_RESET
-           "          Reload configuration from librarian.toml\n");
-    printf("  " COLOR_MINT "/setup" COLOR_RESET
-           "           Download models or display tutorial walkthrough\n");
-    printf("  " COLOR_MINT "/debug" COLOR_RESET "           Toggle console debug diagnostics\n");
-    printf("  " COLOR_MINT "/reset" COLOR_RESET
-           "           Clear database (requires confirmation)\n");
-    printf("  " COLOR_MINT "/clear" COLOR_RESET
-           "           Clear screen and display welcome banner (or Ctrl+L)\n");
-    printf("  " COLOR_MINT "/exit" COLOR_RESET ", " COLOR_MINT "/quit" COLOR_RESET
-           "      Exit the interactive session\n");
-    printf(COLOR_GRAY
-           "  Enter any query to search documents and generate a verified answer.\n" COLOR_RESET
-           "\n");
+    ui_printf("\n" STYLE_HEADING "📚 Librarian REPL Commands:" STYLE_RESET "\n");
+    ui_printf("  " STYLE_SUCCESS "/help" STYLE_RESET
+              "            Display this interactive help menu\n");
+    ui_printf("  " STYLE_SUCCESS "/docs [query]" STYLE_RESET
+              "     List indexed documents matching optional pattern\n");
+    ui_printf("  " STYLE_SUCCESS "/chunks <id> [n]" STYLE_RESET
+              "  Inspect chunks belonging to a document\n");
+    ui_printf("  " STYLE_SUCCESS "/ingest <path>" STYLE_RESET
+              "   Ingest a document file or directory recursively\n");
+    ui_printf("  " STYLE_SUCCESS "/stats" STYLE_RESET
+              "           Display vector database document and chunk statistics\n");
+    ui_printf("  " STYLE_SUCCESS "/config" STYLE_RESET
+              "          Display current model thresholds and paths\n");
+    ui_printf("  " STYLE_SUCCESS "/reload" STYLE_RESET
+              "          Reload configuration from librarian.toml\n");
+    ui_printf("  " STYLE_SUCCESS "/setup" STYLE_RESET
+              "           Download models or display tutorial walkthrough\n");
+    ui_printf("  " STYLE_SUCCESS "/debug" STYLE_RESET
+              "           Toggle console debug diagnostics\n");
+    ui_printf("  " STYLE_SUCCESS "/reset" STYLE_RESET
+              "           Clear database (requires confirmation)\n");
+    ui_printf("  " STYLE_SUCCESS "/clear" STYLE_RESET
+              "           Clear screen and display welcome banner (or Ctrl+L)\n");
+    ui_printf("  " STYLE_SUCCESS "/exit" STYLE_RESET ", " STYLE_SUCCESS "/quit" STYLE_RESET
+              "      Exit the interactive session\n");
+    ui_printf(STYLE_NOTE
+              "  Enter any query to search documents and generate a verified answer.\n" STYLE_RESET
+              "\n");
 }
 
 static int run_chat_mode(const librarian_config_t *initial_cfg)
@@ -657,15 +668,16 @@ static int run_chat_mode(const librarian_config_t *initial_cfg)
     }
 
     ui_success("Models loaded into memory. Interactive REPL active.");
-    printf(COLOR_GRAY "Type /help for commands, or type your question directly.\n" COLOR_RESET
-                      "\n");
+    ui_printf(STYLE_NOTE "Type /help for commands, or type your question directly.\n" STYLE_RESET
+                         "\n");
 
     /* Initialize interactive REPL with persistent history */
     char hist_path[512];
     snprintf(hist_path, sizeof(hist_path), "data/history.txt");
     repl_context_t *repl = repl_init(hist_path);
 
-    const char *prompt_str = COLOR_LAVENDER COLOR_BOLD "📚 librarian" COLOR_MINT " ❯ " COLOR_RESET;
+    char prompt_str[128];
+    brand_prompt(prompt_str, sizeof(prompt_str));
 
     while (1) {
         char *line = repl_readline(repl, prompt_str);
@@ -754,7 +766,7 @@ static int run_chat_mode(const librarian_config_t *initial_cfg)
             int doc_count = 0;
             int chunk_count = 0;
             db_get_stats(db, &doc_count, &chunk_count);
-            printf("\n" COLOR_LAVENDER COLOR_BOLD "Database Statistics:" COLOR_RESET "\n");
+            ui_printf("\n" STYLE_HEADING "Database Statistics:" STYLE_RESET "\n");
             printf("  • Path: %s\n", cfg.db_path);
             printf("  • Documents: %d\n", doc_count);
             printf("  • Chunks: %d\n", chunk_count);
@@ -933,7 +945,7 @@ static int run_chat_mode(const librarian_config_t *initial_cfg)
 static int run_reset_mode(const librarian_config_t *cfg, bool force)
 {
     if (!force) {
-        printf("\n" COLOR_PEACH COLOR_BOLD "Database: " COLOR_RESET "%s\n", cfg->db_path);
+        ui_printf("\n" STYLE_PROGRESS "Database: " STYLE_RESET "%s\n", cfg->db_path);
         if (!ui_confirm("Are you sure you want to clear the entire knowledge database? [y/N]:")) {
             ui_info("Database reset canceled.");
             return 0;
@@ -1052,10 +1064,9 @@ static int run_chunks_mode(const librarian_config_t *cfg, const char *target, co
 
 static void print_usage(const char *prog)
 {
-    printf(COLOR_LAVENDER COLOR_BOLD "librarian" COLOR_RESET
-                                     " - Embedded Pure C99 RAG System v%s\n\n",
-           LIBRARIAN_VERSION);
-    printf(COLOR_BOLD "USAGE:" COLOR_RESET "\n");
+    ui_printf(STYLE_HEADING "librarian" STYLE_RESET " - Embedded Pure C99 RAG System v%s\n\n",
+              LIBRARIAN_VERSION);
+    ui_printf(STYLE_HEADING "USAGE:" STYLE_RESET "\n");
     printf("  %s ingest <file_or_dir>   Index documents into local vector database\n", prog);
     printf("  %s query \"<question>\"     Execute one-off retrieval + generation query\n", prog);
     printf("  %s chat                   Start interactive REPL session\n", prog);
@@ -1065,7 +1076,7 @@ static void print_usage(const char *prog)
     printf("  %s reset [-f|--force]     Clear all indexed documents and chunks\n", prog);
     printf("  %s --version              Display version information\n", prog);
     printf("  %s --help                 Display this help menu\n\n", prog);
-    printf(COLOR_BOLD "OPTIONS:" COLOR_RESET "\n");
+    ui_printf(STYLE_HEADING "OPTIONS:" STYLE_RESET "\n");
     printf("  -d, --debug               Enable verbose engine debug logs to console\n");
     printf("  -f, --force               Bypass confirmation prompt on reset\n");
     printf("  -h, --help                Show help instructions\n");
@@ -1074,6 +1085,14 @@ static void print_usage(const char *prog)
 
 int main(int argc, char **argv)
 {
+    plat_init(&argc, &argv);
+    theme_detect(stdout);
+    char *theme_file = theme_path();
+    if (theme_file) {
+        (void)theme_load_file(theme_file, stderr);
+        free(theme_file);
+    }
+
     if (argc < 2) {
         print_usage(argv[0]);
         return 0;

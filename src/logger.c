@@ -2,6 +2,7 @@
 
 #include "ggml.h"
 #include "llama.h"
+#include "theme.h"
 
 #include <pthread.h>
 #include <stdarg.h>
@@ -189,7 +190,8 @@ void logger_log_level(log_level_t level, const char *fmt, ...)
     (void)pthread_mutex_lock(&g_log_mutex);
 
     if (g_console_echo) {
-        fprintf(stderr, "\x1b[38;2;98;114;164m[%s] \x1b[0m", level_to_string(level));
+        fprintf(stderr, "%s[%s] %s", theme_sgr(THEME_NOTE), level_to_string(level),
+                theme_sgr(THEME_RESET));
         va_list args_console;
         va_start(args_console, fmt);
         vfprintf(stderr, fmt, args_console);

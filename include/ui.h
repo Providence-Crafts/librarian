@@ -4,19 +4,37 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-/* Modern pastel 24-bit ANSI color escape codes */
-#define COLOR_LAVENDER "\x1b[38;2;189;147;249m"
-#define COLOR_MINT "\x1b[38;2;139;233;180m"
-#define COLOR_PEACH "\x1b[38;2;255;184;108m"
-#define COLOR_BLUE "\x1b[38;2;139;190;255m"
-#define COLOR_GRAY "\x1b[38;2;98;114;164m"
-#define COLOR_RED "\x1b[38;2;255;85;85m"
-#define COLOR_BOLD "\x1b[1m"
-#define COLOR_RESET "\x1b[0m"
+/* Style tokens for ui_printf. Each is an in-band marker (SO plus a letter,
+ * concatenated so the letter is never read as a hex digit) that ui_printf
+ * replaces with the theme's SGR sequence for that slot, or with nothing when
+ * colour is off. Outside ui_printf they must not be printed. */
+#define STYLE_RESET                                                                                \
+    "\x0e"                                                                                         \
+    "0"
+#define STYLE_HEADING                                                                              \
+    "\x0e"                                                                                         \
+    "h"
+#define STYLE_SUCCESS                                                                              \
+    "\x0e"                                                                                         \
+    "s"
+#define STYLE_PROGRESS                                                                             \
+    "\x0e"                                                                                         \
+    "p"
+#define STYLE_ERROR                                                                                \
+    "\x0e"                                                                                         \
+    "e"
+#define STYLE_NOTE                                                                                 \
+    "\x0e"                                                                                         \
+    "n"
+#define STYLE_INFO                                                                                 \
+    "\x0e"                                                                                         \
+    "i"
 
 #include "db.h"
 
+/* The start-up banner, sized to the terminal (src/brand.c). */
 void ui_banner(void);
+/* The interactive prompt, themed (src/brand.c). */
 void ui_prompt(void);
 void ui_status(const char *status);
 void ui_clear_status(void);
@@ -36,6 +54,9 @@ bool ui_confirm(const char *prompt);
 #else
 #define ATTR_PRINTF(fmt_idx, arg_idx)
 #endif
+
+/* printf to stdout, expanding STYLE_* tokens in FMT through the theme. */
+int ui_printf(const char *fmt, ...) ATTR_PRINTF(1, 2);
 
 void ui_info(const char *fmt, ...) ATTR_PRINTF(1, 2);
 void ui_success(const char *fmt, ...) ATTR_PRINTF(1, 2);

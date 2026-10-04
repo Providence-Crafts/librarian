@@ -102,7 +102,7 @@ LDFLAGS :=
 # Vendor compile flags (relaxed warnings for 3rd-party code)
 VENDOR_CFLAGS = -std=c99 -O3 -isystem $(VENDOR_DIR)/sqlite -isystem $(VENDOR_DIR)/sqlite-vec -isystem $(VENDOR_DIR)/tomlc99 -DSQLITE_THREADSAFE=1 -DSQLITE_ENABLE_NORMALIZE -DSQLITE_ENABLE_FTS5 $(DEFINES)
 
-.PHONY: all clean release debug asan tsan test valgrind tidy cppcheck format format-check gate compdb watch windows help
+.PHONY: all clean release debug asan tsan test valgrind tidy cppcheck format format-check gate logo compdb watch windows help
 
 all: release
 
@@ -252,13 +252,22 @@ cppcheck:
 	         -I$(INC_DIR) -I$(VENDOR_DIR)/sqlite -I$(VENDOR_DIR)/sqlite-vec -I$(VENDOR_DIR)/tomlc99 -I$(VENDOR_DIR)/llama.cpp/include -I$(VENDOR_DIR)/llama.cpp/ggml/include \
 	         $(SRC_DIR) $(INC_DIR)
 
+FORMAT_SRCS = $(wildcard $(SRC_DIR)/*.c $(SRC_DIR)/*.h $(INC_DIR)/*.h $(TEST_DIR)/*.c $(TEST_DIR)/*.h tools/*.c)
+
 format:
 	@echo "✨ Formatting source code..."
-	clang-format -i $(wildcard $(SRC_DIR)/*.c) $(wildcard $(INC_DIR)/*.h) $(wildcard $(TEST_DIR)/*.c) $(wildcard $(TEST_DIR)/*.h)
+	clang-format -i $(FORMAT_SRCS)
 
 format-check:
-	@clang-format --dry-run --Werror $(wildcard $(SRC_DIR)/*.c) $(wildcard $(INC_DIR)/*.h) \
-	              $(wildcard $(TEST_DIR)/*.c) $(wildcard $(TEST_DIR)/*.h)
+	@clang-format --dry-run --Werror $(FORMAT_SRCS)
+
+# docs/logo.svg is generated from the banner art in src/brand_art.h.
+logo: docs/logo.svg
+
+docs/logo.svg: tools/logo.c $(SRC_DIR)/brand_art.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(STD) -Wall -Wextra -o $(BUILD_DIR)/logo tools/logo.c
+	./$(BUILD_DIR)/logo > $@
 
 # The single definition of done (docs/family.md): run it in `nix develop`.
 gate:
@@ -301,6 +310,7 @@ help:
 	@echo "  make tidy       - Run clang-tidy static analysis"
 	@echo "  make cppcheck   - Run cppcheck static analyzer"
 	@echo "  make format     - Auto-format code with clang-format"
+	@echo "  make logo       - Regenerate docs/logo.svg from src/brand_art.h"
 	@echo "  make gate       - Format check, -Werror build, tests, cppcheck, clang-tidy"
 	@echo "  make compdb     - Generate compile_commands.json for clangd"
 	@echo "  make watch      - Automatically rerun tests on change"

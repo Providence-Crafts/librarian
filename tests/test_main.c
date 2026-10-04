@@ -25,6 +25,9 @@ extern const char *test_doc_text_extraction(void);
 extern const char *test_doc_git_lfs_and_html(void);
 extern const char *test_doc_clean_path(void);
 extern const char *test_pipeline_concurrent_ingest(void);
+extern const char *test_brand_prompt(void);
+extern const char *test_brand_banner_gating(void);
+extern const char *test_ui_printf_tokens(void);
 
 static const char *all_tests(void)
 {
@@ -47,6 +50,9 @@ static const char *all_tests(void)
     mu_run_test(test_doc_git_lfs_and_html);
     mu_run_test(test_doc_clean_path);
     mu_run_test(test_pipeline_concurrent_ingest);
+    mu_run_test(test_brand_prompt);
+    mu_run_test(test_brand_banner_gating);
+    mu_run_test(test_ui_printf_tokens);
     return NULL;
 }
 

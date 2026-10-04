@@ -1,5 +1,10 @@
 #include "ui.h"
 
+#include "brand.h"
+#include "plat.h"
+#include "theme.h"
+#include "version.h"
+
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -21,146 +26,95 @@
 #include <unistd.h>
 #endif
 
-static const char *const g_banner_lines[12] = {
-    "        "
-    "\x1b[38;2;175;143;88m\x1b[49m▄\x1b[38;2;165;132;78m\x1b[49m▄\x1b[38;2;173;140;86m\x1b[48;2;"
-    "146;116;68m▀\x1b[38;2;179;144;92m\x1b[48;2;166;133;83m▀\x1b[38;2;176;142;87m\x1b[48;2;177;143;"
-    "89m▀\x1b[38;2;176;142;89m\x1b[48;2;174;141;86m▀\x1b[38;2;177;142;86m\x1b[49m▄\x1b[38;2;188;"
-    "153;95m\x1b[49m▄        \x1b[0m",
-    "    "
-    "\x1b[38;2;181;146;91m\x1b[49m▄\x1b[38;2;177;144;90m\x1b[49m▄\x1b[38;2;124;98;57m\x1b[48;2;182;"
-    "147;91m▀\x1b[38;2;136;110;62m\x1b[48;2;164;131;80m▀\x1b[38;2;165;135;81m\x1b[48;2;142;113;"
-    "66m▀\x1b[38;2;179;145;91m\x1b[48;2;160;128;77m▀\x1b[38;2;166;136;81m\x1b[48;2;170;138;"
-    "83m▀\x1b[38;2;166;133;80m\x1b[48;2;168;137;81m▀\x1b[38;2;158;124;73m\x1b[48;2;178;145;"
-    "88m▀\x1b[38;2;158;126;75m\x1b[48;2;161;129;78m▀\x1b[38;2;167;135;82m\x1b[48;2;121;96;55m▀\x1b["
-    "38;2;171;139;83m\x1b[48;2;139;112;65m▀\x1b[38;2;185;150;93m\x1b[48;2;164;134;81m▀\x1b[38;2;"
-    "187;151;94m\x1b[48;2;175;142;90m▀\x1b[38;2;182;148;92m\x1b[49m▄\x1b[38;2;189;152;94m\x1b[49m▄ "
-    "   \x1b[0m",
-    "\x1b[38;2;122;96;54m\x1b[49m▄\x1b[38;2;171;139;83m\x1b[48;2;134;107;61m▀\x1b[38;2;176;144;"
-    "86m\x1b[48;2;151;123;71m▀\x1b[38;2;154;124;74m\x1b[48;2;171;139;85m▀\x1b[38;2;132;104;62m\x1b["
-    "48;2;180;145;92m▀\x1b[38;2;149;118;70m\x1b[48;2;179;145;89m▀\x1b[38;2;170;137;83m\x1b[48;2;"
-    "164;130;77m▀\x1b[38;2;174;141;88m\x1b[48;2;138;110;63m▀\x1b[38;2;178;144;91m\x1b[48;2;147;120;"
-    "70m▀\x1b[38;2;166;134;79m\x1b[48;2;166;136;81m▀\x1b[38;2;146;117;68m\x1b[48;2;170;139;"
-    "83m▀\x1b[38;2;137;109;63m\x1b[48;2;173;140;86m▀\x1b[38;2;151;120;69m\x1b[48;2;141;112;"
-    "67m▀\x1b[38;2;157;125;73m\x1b[48;2;134;106;64m▀\x1b[38;2;165;136;80m\x1b[48;2;167;135;"
-    "84m▀\x1b[38;2;170;137;83m\x1b[48;2;175;142;86m▀\x1b[38;2;142;113;66m\x1b[48;2;181;146;"
-    "92m▀\x1b[38;2;132;106;61m\x1b[48;2;169;136;84m▀\x1b[38;2;163;133;78m\x1b[48;2;133;106;"
-    "61m▀\x1b[38;2;174;141;85m\x1b[48;2;130;103;60m▀\x1b[38;2;184;149;94m\x1b[48;2;168;135;"
-    "85m▀\x1b[38;2;187;152;95m\x1b[48;2;164;133;80m▀\x1b[38;2;185;146;94m\x1b[48;2;157;128;"
-    "76m▀\x1b[38;2;127;99;56m\x1b[49m▄\x1b[0m",
-    "\x1b[38;2;133;105;61m\x1b[48;2;123;97;56m▀\x1b[38;2;113;93;54m\x1b[48;2;39;30;16m▀\x1b[38;2;"
-    "119;94;53m\x1b[48;2;61;47;26m▀\x1b[38;2;121;95;54m\x1b[48;2;97;75;42m▀\x1b[38;2;158;127;"
-    "78m\x1b[48;2;118;92;54m▀\x1b[38;2;163;134;78m\x1b[48;2;144;113;64m▀\x1b[38;2;169;137;83m\x1b["
-    "48;2;150;118;67m▀\x1b[38;2;168;136;84m\x1b[48;2;165;134;81m▀\x1b[38;2;133;107;62m\x1b[48;2;"
-    "171;139;86m▀\x1b[38;2;122;98;56m\x1b[48;2;183;148;93m▀\x1b[38;2;154;124;73m\x1b[48;2;164;131;"
-    "79m▀\x1b[38;2;164;134;79m\x1b[48;2;147;117;67m▀\x1b[38;2;173;141;84m\x1b[48;2;151;122;"
-    "71m▀\x1b[38;2;178;145;88m\x1b[48;2;158;130;76m▀\x1b[38;2;158;126;76m\x1b[48;2;168;138;"
-    "82m▀\x1b[38;2;143;114;66m\x1b[48;2;175;142;86m▀\x1b[38;2;163;131;78m\x1b[48;2;163;130;"
-    "79m▀\x1b[38;2;169;137;85m\x1b[48;2;131;105;60m▀\x1b[38;2;176;142;89m\x1b[48;2;134;109;"
-    "63m▀\x1b[38;2;162;132;79m\x1b[48;2;126;103;61m▀\x1b[38;2;138;110;66m\x1b[48;2;82;67;39m▀\x1b["
-    "38;2;110;86;49m\x1b[48;2;50;61;71m▀\x1b[38;2;89;71;41m\x1b[48;2;29;34;40m▀\x1b[38;2;102;79;"
-    "46m\x1b[48;2;94;73;42m▀\x1b[0m   \x1b[38;2;189;147;249m\x1b[1m📚  L I B R A R I A N\x1b[0m",
-    "\x1b[38;2;125;86;50m\x1b[48;2;155;107;68m▀\x1b[38;2;80;29;15m\x1b[48;2;120;26;12m▀\x1b[38;2;"
-    "54;37;19m\x1b[48;2;94;38;6m▀\x1b[38;2;70;27;16m\x1b[48;2;128;18;15m▀\x1b[38;2;57;42;23m\x1b["
-    "48;2;79;27;17m▀\x1b[38;2;92;71;40m\x1b[48;2;43;33;18m▀\x1b[38;2;129;100;56m\x1b[48;2;48;37;"
-    "21m▀\x1b[38;2;128;102;59m\x1b[48;2;90;74;42m▀\x1b[38;2;139;111;66m\x1b[48;2;122;100;58m▀\x1b["
-    "38;2;164;134;80m\x1b[48;2;115;92;52m▀\x1b[38;2;169;137;82m\x1b[48;2;125;101;57m▀\x1b[38;2;176;"
-    "143;88m\x1b[48;2;153;125;73m▀\x1b[38;2;166;133;82m\x1b[48;2;167;137;81m▀\x1b[38;2;130;102;"
-    "60m\x1b[48;2;179;146;88m▀\x1b[38;2;132;106;62m\x1b[48;2;143;114;68m▀\x1b[38;2;157;128;76m\x1b["
-    "48;2;90;69;39m▀\x1b[38;2;133;105;60m\x1b[48;2;59;47;27m▀\x1b[38;2;110;86;49m\x1b[48;2;36;28;"
-    "16m▀\x1b[38;2;71;55;31m\x1b[48;2;44;37;12m▀\x1b[38;2;47;38;19m\x1b[48;2;87;81;16m▀\x1b[38;2;"
-    "34;27;12m\x1b[48;2;73;34;19m▀\x1b[38;2;29;56;91m\x1b[48;2;29;57;93m▀\x1b[38;2;22;56;58m\x1b["
-    "48;2;17;68;69m▀\x1b[38;2;84;76;46m\x1b[48;2;99;94;61m▀\x1b[0m   \x1b[38;2;139;190;255mLocal "
-    "Embedded RAG Knowledge Engine\x1b[0m",
-    "\x1b[38;2;142;95;56m\x1b[48;2;129;93;53m▀\x1b[38;2;123;27;13m\x1b[48;2;106;41;20m▀\x1b[38;2;"
-    "91;37;6m\x1b[48;2;70;35;10m▀\x1b[38;2;137;19;16m\x1b[48;2;128;23;14m▀\x1b[38;2;80;32;29m\x1b["
-    "48;2;68;56;75m▀\x1b[38;2;52;39;22m\x1b[48;2;39;44;47m▀\x1b[38;2;74;70;19m\x1b[48;2;103;119;"
-    "33m▀\x1b[38;2;92;83;11m\x1b[48;2;128;126;104m▀\x1b[38;2;48;39;18m\x1b[48;2;81;52;30m▀\x1b[38;"
-    "2;80;86;86m\x1b[48;2;38;73;118m▀\x1b[38;2;112;93;59m\x1b[48;2;37;45;54m▀\x1b[38;2;118;93;"
-    "53m\x1b[48;2;119;93;54m▀\x1b[38;2;120;96;55m\x1b[48;2;91;71;41m▀\x1b[38;2;98;81;47m\x1b[48;2;"
-    "30;24;13m▀\x1b[38;2;60;47;27m\x1b[48;2;35;27;15m▀\x1b[38;2;46;27;15m\x1b[48;2;93;11;10m▀\x1b["
-    "38;2;46;23;13m\x1b[48;2;61;22;16m▀\x1b[38;2;39;30;16m\x1b[48;2;34;28;18m▀\x1b[38;2;72;76;"
-    "33m\x1b[48;2;79;88;9m▀\x1b[38;2;97;95;71m\x1b[48;2;90;88;7m▀\x1b[38;2;86;29;18m\x1b[48;2;73;"
-    "44;6m▀\x1b[38;2;30;58;95m\x1b[48;2;29;54;87m▀\x1b[38;2;18;69;72m\x1b[48;2;36;64;65m▀\x1b[38;2;"
-    "86;82;50m\x1b[48;2;88;74;44m▀\x1b[0m   \x1b[38;2;98;114;164mZero Dependencies • Pure C99 • "
-    "Local GGUF\x1b[0m",
-    "\x1b[38;2;138;108;62m\x1b[48;2;128;101;58m▀\x1b[38;2;140;110;66m\x1b[48;2;82;64;34m▀\x1b[38;2;"
-    "124;99;62m\x1b[48;2;120;98;57m▀\x1b[38;2;119;50;30m\x1b[48;2;146;119;75m▀\x1b[38;2;63;55;"
-    "65m\x1b[48;2;136;115;83m▀\x1b[38;2;75;97;43m\x1b[48;2;99;100;48m▀\x1b[38;2;92;104;11m\x1b[48;"
-    "2;66;62;15m▀\x1b[38;2;123;115;17m\x1b[48;2;111;114;10m▀\x1b[38;2;114;39;22m\x1b[48;2;101;52;"
-    "10m▀\x1b[38;2;38;74;121m\x1b[48;2;38;74;121m▀\x1b[38;2;34;60;65m\x1b[48;2;23;90;91m▀\x1b[38;2;"
-    "115;93;54m\x1b[48;2;98;104;65m▀\x1b[38;2;90;68;39m\x1b[48;2;97;58;34m▀\x1b[38;2;52;25;11m\x1b["
-    "48;2;87;19;8m▀\x1b[38;2;67;29;6m\x1b[48;2;70;28;4m▀\x1b[38;2;107;12;12m\x1b[48;2;104;16;"
-    "11m▀\x1b[38;2;56;37;58m\x1b[48;2;48;43;51m▀\x1b[38;2;50;60;27m\x1b[48;2;56;70;24m▀\x1b[38;2;"
-    "67;72;8m\x1b[48;2;68;55;25m▀\x1b[38;2;83;85;7m\x1b[48;2;104;86;44m▀\x1b[38;2;81;58;18m\x1b[48;"
-    "2;107;87;55m▀\x1b[38;2;87;77;62m\x1b[48;2;90;70;40m▀\x1b[38;2;100;78;46m\x1b[48;2;55;42;"
-    "25m▀\x1b[38;2;103;80;46m\x1b[48;2;96;75;43m▀\x1b[0m",
-    "\x1b[38;2;138;93;56m\x1b[48;2;145;113;77m▀\x1b[38;2;108;23;17m\x1b[48;2;130;105;105m▀\x1b[38;"
-    "2;45;27;16m\x1b[48;2;54;56;42m▀\x1b[38;2;64;52;31m\x1b[48;2;37;61;88m▀\x1b[38;2;108;89;"
-    "53m\x1b[48;2;61;72;29m▀\x1b[38;2;138;111;67m\x1b[48;2;87;89;22m▀\x1b[38;2;135;106;59m\x1b[48;"
-    "2;107;83;47m▀\x1b[38;2;122;112;39m\x1b[48;2;135;111;66m▀\x1b[38;2;99;61;13m\x1b[48;2;144;116;"
-    "72m▀\x1b[38;2;37;72;116m\x1b[48;2;95;94;89m▀\x1b[38;2;25;94;98m\x1b[48;2;33;87;85m▀\x1b[38;2;"
-    "118;124;82m\x1b[48;2;103;107;66m▀\x1b[38;2;118;74;48m\x1b[48;2;106;65;38m▀\x1b[38;2;95;20;"
-    "9m\x1b[48;2;83;23;12m▀\x1b[38;2;56;27;7m\x1b[48;2;82;61;36m▀\x1b[38;2;91;20;13m\x1b[48;2;116;"
-    "91;59m▀\x1b[38;2;86;67;49m\x1b[48;2;103;84;52m▀\x1b[38;2;107;88;57m\x1b[48;2;86;72;34m▀\x1b["
-    "38;2;102;80;46m\x1b[48;2;50;40;22m▀\x1b[38;2;87;71;42m\x1b[48;2;30;23;13m▀\x1b[38;2;57;46;"
-    "26m\x1b[48;2;47;50;10m▀\x1b[38;2;36;30;12m\x1b[48;2;46;64;15m▀\x1b[38;2;32;25;13m\x1b[48;2;18;"
-    "68;51m▀\x1b[38;2;85;68;40m\x1b[48;2;88;79;54m▀\x1b[0m",
-    "\x1b[38;2;149;100;62m\x1b[48;2;129;90;54m▀\x1b[38;2;134;21;20m\x1b[48;2;116;26;11m▀\x1b[38;2;"
-    "38;73;57m\x1b[48;2;33;73;48m▀\x1b[38;2;35;75;116m\x1b[48;2;35;75;116m▀\x1b[38;2;67;90;52m\x1b["
-    "48;2;55;72;66m▀\x1b[38;2;79;96;11m\x1b[48;2;73;86;21m▀\x1b[38;2;69;26;16m\x1b[48;2;111;17;"
-    "15m▀\x1b[38;2;54;43;25m\x1b[48;2;64;35;20m▀\x1b[38;2;95;78;45m\x1b[48;2;54;53;15m▀\x1b[38;2;"
-    "130;102;59m\x1b[48;2;52;43;20m▀\x1b[38;2;132;106;62m\x1b[48;2;75;58;35m▀\x1b[38;2;123;102;"
-    "59m\x1b[48;2;125;98;58m▀\x1b[38;2;101;76;43m\x1b[48;2;100;77;44m▀\x1b[38;2;106;82;49m\x1b[48;"
-    "2;67;52;28m▀\x1b[38;2;101;82;50m\x1b[48;2;35;27;15m▀\x1b[38;2;70;57;34m\x1b[48;2;27;37;"
-    "50m▀\x1b[38;2;55;56;16m\x1b[48;2;51;67;35m▀\x1b[38;2;55;67;7m\x1b[48;2;60;72;8m▀\x1b[38;2;70;"
-    "17;12m\x1b[48;2;93;13;10m▀\x1b[38;2;51;24;14m\x1b[48;2;97;13;12m▀\x1b[38;2;59;68;11m\x1b[48;2;"
-    "76;65;10m▀\x1b[38;2;64;77;30m\x1b[48;2;46;73;22m▀\x1b[38;2;74;90;86m\x1b[48;2;13;67;61m▀\x1b["
-    "38;2;102;87;57m\x1b[48;2;93;79;52m▀\x1b[0m",
-    "\x1b[38;2;142;109;64m\x1b[49m▀\x1b[38;2;128;77;45m\x1b[48;2;150;122;76m▀\x1b[38;2;86;68;"
-    "39m\x1b[48;2;156;127;82m▀\x1b[38;2;39;71;108m\x1b[48;2;114;106;92m▀\x1b[38;2;49;65;83m\x1b[48;"
-    "2;77;90;59m▀\x1b[38;2;52;52;52m\x1b[48;2;65;74;28m▀\x1b[38;2;107;30;9m\x1b[48;2;67;35;"
-    "19m▀\x1b[38;2;105;21;17m\x1b[48;2;129;16;16m▀\x1b[38;2;74;84;13m\x1b[48;2;102;87;14m▀\x1b[38;"
-    "2;64;72;12m\x1b[48;2;67;99;35m▀\x1b[38;2;42;32;17m\x1b[48;2;26;86;64m▀\x1b[38;2;114;89;"
-    "51m\x1b[48;2;103;91;55m▀\x1b[38;2;94;68;39m\x1b[48;2;107;75;50m▀\x1b[38;2;70;18;12m\x1b[48;2;"
-    "99;72;72m▀\x1b[38;2;41;30;19m\x1b[48;2;28;65;53m▀\x1b[38;2;29;57;93m\x1b[48;2;29;57;94m▀\x1b["
-    "38;2;45;58;47m\x1b[48;2;37;47;60m▀\x1b[38;2;44;47;32m\x1b[48;2;42;43;35m▀\x1b[38;2;71;24;"
-    "8m\x1b[48;2;56;34;18m▀\x1b[38;2;102;11;11m\x1b[48;2;85;33;16m▀\x1b[38;2;76;60;10m\x1b[48;2;96;"
-    "74;39m▀\x1b[38;2;49;66;18m\x1b[48;2;109;89;54m▀\x1b[38;2;64;72;54m\x1b[48;2;108;83;48m▀\x1b["
-    "38;2;105;83;49m\x1b[49m▀\x1b[0m",
-    "    "
-    "\x1b[38;2;155;125;80m\x1b[49m▀\x1b[38;2;125;108;52m\x1b[49m▀\x1b[38;2;102;75;42m\x1b[48;2;144;"
-    "114;67m▀\x1b[38;2;114;25;11m\x1b[48;2;142;101;65m▀\x1b[38;2;103;85;14m\x1b[48;2;107;92;"
-    "35m▀\x1b[38;2;80;102;41m\x1b[48;2;54;89;26m▀\x1b[38;2;104;121;116m\x1b[48;2;15;92;74m▀\x1b[38;"
-    "2;115;103;75m\x1b[48;2;118;113;74m▀\x1b[38;2;109;74;49m\x1b[48;2;115;70;44m▀\x1b[38;2;100;20;"
-    "18m\x1b[48;2;93;20;9m▀\x1b[38;2;27;52;38m\x1b[48;2;58;48;27m▀\x1b[38;2;30;57;93m\x1b[48;2;59;"
-    "66;73m▀\x1b[38;2;43;60;47m\x1b[48;2;101;88;64m▀\x1b[38;2;71;73;20m\x1b[48;2;110;87;51m▀\x1b["
-    "38;2;97;76;45m\x1b[49m▀\x1b[38;2;113;91;60m\x1b[49m▀    \x1b[0m",
-    "        "
-    "\x1b[38;2;150;122;77m\x1b[49m▀\x1b[38;2;130;113;68m\x1b[49m▀\x1b[38;2;77;89;77m\x1b[48;2;142;"
-    "112;64m▀\x1b[38;2;118;101;72m\x1b[48;2;142;112;65m▀\x1b[38;2;98;66;40m\x1b[48;2;108;86;"
-    "51m▀\x1b[38;2;96;50;31m\x1b[48;2;114;92;58m▀\x1b[38;2;112;89;56m\x1b[49m▀\x1b[38;2;123;101;"
-    "64m\x1b[49m▀        \x1b[0m",
-};
+/* The SGR for a STYLE_* token letter, "" for an unknown one. */
+static const char *token_sgr(char letter)
+{
+    switch (letter) {
+    case '0':
+        return theme_sgr(THEME_RESET);
+    case 'h':
+        return theme_sgr(THEME_HEADING);
+    case 's':
+        return theme_sgr(THEME_SUCCESS);
+    case 'p':
+        return theme_sgr(THEME_PROGRESS);
+    case 'e':
+        return theme_sgr(THEME_ERROR);
+    case 'n':
+        return theme_sgr(THEME_NOTE);
+    case 'i':
+        return theme_sgr(THEME_INFO);
+    default:
+        return "";
+    }
+}
+
+int ui_printf(const char *fmt, ...)
+{
+    char stack[1024];
+    char *buf = stack;
+    size_t need = 1u;
+    size_t n = 0u;
+    const char *p;
+    va_list ap;
+    int rc;
+
+    for (p = fmt; *p != '\0'; p++) {
+        if (*p == '\x0e' && p[1] != '\0') {
+            need += strlen(token_sgr(*++p));
+        } else {
+            need++;
+        }
+    }
+    if (need > sizeof(stack)) {
+        buf = malloc(need);
+        if (!buf) {
+            return -1;
+        }
+    }
+    for (p = fmt; *p != '\0'; p++) {
+        if (*p == '\x0e' && p[1] != '\0') {
+            const char *sgr = token_sgr(*++p);
+            size_t len = strlen(sgr);
+
+            memcpy(buf + n, sgr, len);
+            n += len;
+        } else {
+            buf[n++] = *p;
+        }
+    }
+    buf[n] = '\0';
+
+    va_start(ap, fmt);
+    rc = vprintf(buf, ap); /* NOLINT(clang-diagnostic-format-nonliteral) */
+    va_end(ap);
+    if (buf != stack) {
+        free(buf);
+    }
+    return rc;
+}
 
 void ui_banner(void)
 {
-    printf("\n");
-    for (size_t i = 0; i < 12; i++) {
-        printf("%s\n", g_banner_lines[i]);
-    }
-    printf("\n");
+    unsigned cols = 80u;
+    unsigned rows = 0u;
+
+    (void)plat_term_size(stdout, &cols, &rows);
+    brand_banner(stdout, cols, LIBRARIAN_VERSION);
 }
 
 void ui_prompt(void)
 {
-    printf(COLOR_LAVENDER COLOR_BOLD "📚 librarian" COLOR_MINT " ❯ " COLOR_RESET);
+    char prompt[128];
+
+    brand_prompt(prompt, sizeof(prompt));
+    fputs(prompt, stdout);
     fflush(stdout);
 }
 
 void ui_status(const char *status)
 {
-    printf("\r\x1b[K" COLOR_PEACH "%s" COLOR_RESET, status);
+    ui_printf("\r\x1b[K" STYLE_PROGRESS "%s" STYLE_RESET, status);
     fflush(stdout);
 }
 
@@ -230,10 +184,10 @@ void ui_ingest_progress(size_t current, size_t total, const char *file_path)
         snprintf(path_buf, sizeof(path_buf), "%.*s", (int)(sizeof(path_buf) - 1), disp_path);
     }
 
-    printf("\r\x1b[K" COLOR_LAVENDER COLOR_BOLD "📦 Ingesting [" COLOR_MINT "%zu/%zu" COLOR_LAVENDER
-           "] " COLOR_PEACH "(%3d%%)" COLOR_RESET " " COLOR_BLUE "•" COLOR_RESET " " COLOR_GRAY
-           "%s" COLOR_RESET,
-           current, total, pct, path_buf);
+    ui_printf("\r\x1b[K" STYLE_HEADING "📦 Ingesting [" STYLE_SUCCESS "%zu/%zu" STYLE_HEADING
+              "] " STYLE_PROGRESS "(%3d%%)" STYLE_RESET " " STYLE_INFO "•" STYLE_RESET
+              " " STYLE_NOTE "%s" STYLE_RESET,
+              current, total, pct, path_buf);
     fflush(stdout);
 }
 
@@ -285,10 +239,10 @@ void ui_ingest_progress_chunk(size_t current, size_t total, const char *file_pat
         snprintf(path_buf, sizeof(path_buf), "%.*s", (int)(sizeof(path_buf) - 1), disp_path);
     }
 
-    printf("\r\x1b[K" COLOR_LAVENDER COLOR_BOLD "📦 Ingesting [" COLOR_MINT "%zu/%zu" COLOR_LAVENDER
-           "] " COLOR_PEACH "(%3d%%)" COLOR_RESET " " COLOR_BLUE "•" COLOR_RESET " " COLOR_GRAY
-           "%s" COLOR_PEACH "%s" COLOR_RESET,
-           current, total, pct, path_buf, chunk_tag);
+    ui_printf("\r\x1b[K" STYLE_HEADING "📦 Ingesting [" STYLE_SUCCESS "%zu/%zu" STYLE_HEADING
+              "] " STYLE_PROGRESS "(%3d%%)" STYLE_RESET " " STYLE_INFO "•" STYLE_RESET
+              " " STYLE_NOTE "%s" STYLE_PROGRESS "%s" STYLE_RESET,
+              current, total, pct, path_buf, chunk_tag);
     fflush(stdout);
 }
 
@@ -303,16 +257,16 @@ void ui_confidence_badge(float confidence, bool is_refusal)
     }
 
     if (is_refusal) {
-        printf(COLOR_PEACH "✦ [Refusal Confidence: %d%%]" COLOR_RESET "\n", pct);
+        ui_printf(STYLE_PROGRESS "✦ [Refusal Confidence: %d%%]" STYLE_RESET "\n", pct);
     } else {
-        printf(COLOR_MINT "✦ [Confidence: %d%%]" COLOR_RESET "\n", pct);
+        ui_printf(STYLE_SUCCESS "✦ [Confidence: %d%%]" STYLE_RESET "\n", pct);
     }
 }
 
 void ui_similarity_badge(float similarity, float threshold)
 {
-    printf(COLOR_LAVENDER "◈ [Similarity: %.3f / min: %.3f]" COLOR_RESET "\n", (double)similarity,
-           (double)threshold);
+    ui_printf(STYLE_HEADING "◈ [Similarity: %.3f / min: %.3f]" STYLE_RESET "\n", (double)similarity,
+              (double)threshold);
 }
 
 static void format_snippet(const char *content, char *out, size_t out_sz)
@@ -374,7 +328,7 @@ void ui_references(const search_result_t *results, int count, float min_threshol
         return;
     }
 
-    printf(COLOR_LAVENDER COLOR_BOLD "📑 References:" COLOR_RESET "\n");
+    ui_printf(STYLE_HEADING "📑 References:" STYLE_RESET "\n");
 
     const char *home = getenv("HOME");
     size_t home_len = home ? strlen(home) : 0;
@@ -416,18 +370,18 @@ void ui_references(const search_result_t *results, int count, float min_threshol
         const char *slash = strrchr(disp_path, '/');
         const char *fname = slash ? slash + 1 : disp_path;
 
-        printf("  " COLOR_BLUE COLOR_BOLD "[%d]" COLOR_RESET " " COLOR_MINT "%.1f%%" COLOR_RESET
-               " " COLOR_BLUE "•" COLOR_RESET " " COLOR_LAVENDER COLOR_BOLD "%s" COLOR_RESET
-               " " COLOR_PEACH "[chunk #%d]" COLOR_RESET "\n",
-               ref_idx, (double)(r->similarity * 100.0f), fname, r->chunk_idx);
+        ui_printf("  " STYLE_INFO "[%d]" STYLE_RESET " " STYLE_SUCCESS "%.1f%%" STYLE_RESET
+                  " " STYLE_INFO "•" STYLE_RESET " " STYLE_HEADING "%s" STYLE_RESET
+                  " " STYLE_PROGRESS "[chunk #%d]" STYLE_RESET "\n",
+                  ref_idx, (double)(r->similarity * 100.0f), fname, r->chunk_idx);
 
-        printf("      " COLOR_GRAY "%s" COLOR_RESET "\n", disp_path);
+        ui_printf("      " STYLE_NOTE "%s" STYLE_RESET "\n", disp_path);
 
         if (r->content && r->content[0] != '\0') {
             char snippet[128];
             format_snippet(r->content, snippet, sizeof(snippet));
             if (snippet[0] != '\0') {
-                printf("      " COLOR_GRAY "\"%s\"" COLOR_RESET "\n", snippet);
+                ui_printf("      " STYLE_NOTE "\"%s\"" STYLE_RESET "\n", snippet);
             }
         }
         printf("\n");
@@ -439,22 +393,20 @@ void ui_list_documents(const doc_info_t *docs, int count, const char *search_pat
 {
     if (!docs || count == 0) {
         if (search_pattern && search_pattern[0] != '\0') {
-            printf(COLOR_PEACH "No documents found matching '%s'." COLOR_RESET "\n\n",
-                   search_pattern);
+            ui_printf(STYLE_PROGRESS "No documents found matching '%s'." STYLE_RESET "\n\n",
+                      search_pattern);
         } else {
-            printf(COLOR_PEACH "No documents currently indexed in the knowledge base." COLOR_RESET
-                               "\n\n");
+            ui_printf(STYLE_PROGRESS
+                      "No documents currently indexed in the knowledge base." STYLE_RESET "\n\n");
         }
         return;
     }
 
     if (search_pattern && search_pattern[0] != '\0') {
-        printf(COLOR_LAVENDER COLOR_BOLD "🗂 Indexed Documents (%d matching '%s'):" COLOR_RESET
-                                         "\n",
-               count, search_pattern);
+        ui_printf(STYLE_HEADING "🗂 Indexed Documents (%d matching '%s'):" STYLE_RESET "\n", count,
+                  search_pattern);
     } else {
-        printf(COLOR_LAVENDER COLOR_BOLD "🗂 Indexed Documents (%d total):" COLOR_RESET "\n",
-               count);
+        ui_printf(STYLE_HEADING "🗂 Indexed Documents (%d total):" STYLE_RESET "\n", count);
     }
 
     const char *home = getenv("HOME");
@@ -473,23 +425,20 @@ void ui_list_documents(const doc_info_t *docs, int count, const char *search_pat
 
         if (interactive) {
             if (search_pattern && search_pattern[0] != '\0') {
-                printf(COLOR_LAVENDER COLOR_BOLD
-                       "🗂 Indexed Documents [Page %d/%d] (%d matching '%s'):" COLOR_RESET "\n",
-                       current_page + 1, total_pages, count, search_pattern);
+                ui_printf(STYLE_HEADING
+                          "🗂 Indexed Documents [Page %d/%d] (%d matching '%s'):" STYLE_RESET "\n",
+                          current_page + 1, total_pages, count, search_pattern);
             } else {
-                printf(COLOR_LAVENDER COLOR_BOLD
-                       "🗂 Indexed Documents [Page %d/%d] (%d total):" COLOR_RESET "\n",
-                       current_page + 1, total_pages, count);
+                ui_printf(STYLE_HEADING "🗂 Indexed Documents [Page %d/%d] (%d total):" STYLE_RESET
+                                        "\n",
+                          current_page + 1, total_pages, count);
             }
         } else if (current_page == 0) {
             if (search_pattern && search_pattern[0] != '\0') {
-                printf(COLOR_LAVENDER COLOR_BOLD
-                       "🗂 Indexed Documents (%d matching '%s'):" COLOR_RESET "\n",
-                       count, search_pattern);
+                ui_printf(STYLE_HEADING "🗂 Indexed Documents (%d matching '%s'):" STYLE_RESET "\n",
+                          count, search_pattern);
             } else {
-                printf(COLOR_LAVENDER COLOR_BOLD "🗂 Indexed Documents (%d total):" COLOR_RESET
-                                                 "\n",
-                       count);
+                ui_printf(STYLE_HEADING "🗂 Indexed Documents (%d total):" STYLE_RESET "\n", count);
             }
         }
 
@@ -523,19 +472,19 @@ void ui_list_documents(const doc_info_t *docs, int count, const char *search_pat
             const char *slash = strrchr(disp_path, '/');
             const char *fname = slash ? slash + 1 : disp_path;
 
-            printf("  " COLOR_BLUE COLOR_BOLD "#%-4lld" COLOR_RESET " " COLOR_PEACH
-                   "[%3d chunks]" COLOR_RESET " " COLOR_LAVENDER COLOR_BOLD "%s" COLOR_RESET "\n",
-                   (long long)d->id, d->chunk_count, fname);
-            printf("         " COLOR_GRAY "%s" COLOR_RESET "\n", disp_path);
+            ui_printf("  " STYLE_INFO "#%-4lld" STYLE_RESET " " STYLE_PROGRESS
+                      "[%3d chunks]" STYLE_RESET " " STYLE_HEADING "%s" STYLE_RESET "\n",
+                      (long long)d->id, d->chunk_count, fname);
+            ui_printf("         " STYLE_NOTE "%s" STYLE_RESET "\n", disp_path);
         }
 
         if (!interactive) {
             break;
         }
 
-        printf("\n" COLOR_BLUE
-               "── [Page %d/%d] (Enter/n: next, p: prev, q: quit, 1-%d: page): " COLOR_RESET,
-               current_page + 1, total_pages, total_pages);
+        ui_printf("\n" STYLE_INFO
+                  "── [Page %d/%d] (Enter/n: next, p: prev, q: quit, 1-%d: page): " STYLE_RESET,
+                  current_page + 1, total_pages, total_pages);
         fflush(stdout);
 
         char line[64];
@@ -560,7 +509,7 @@ void ui_list_documents(const doc_info_t *docs, int count, const char *search_pat
             if (current_page + 1 < total_pages) {
                 current_page++;
             } else {
-                printf(COLOR_GRAY "Reached end of list." COLOR_RESET "\n\n");
+                ui_printf(STYLE_NOTE "Reached end of list." STYLE_RESET "\n\n");
                 break;
             }
         } else if (isdigit((unsigned char)*t)) {
@@ -570,17 +519,18 @@ void ui_list_documents(const doc_info_t *docs, int count, const char *search_pat
             }
         }
     }
-    printf("\n" COLOR_GRAY
-           "💡 Tip: Inspect chunks with `/chunks <ID>` or `./bin/librarian chunks <ID>`" COLOR_RESET
-           "\n\n");
+    ui_printf(
+        "\n" STYLE_NOTE
+        "💡 Tip: Inspect chunks with `/chunks <ID>` or `./bin/librarian chunks <ID>`" STYLE_RESET
+        "\n\n");
 }
 
 void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *chunks, int count,
                     int limit)
 {
     if (!chunks || count == 0) {
-        printf(COLOR_PEACH "No chunks found for document #%lld." COLOR_RESET "\n\n",
-               (long long)doc_id);
+        ui_printf(STYLE_PROGRESS "No chunks found for document #%lld." STYLE_RESET "\n\n",
+                  (long long)doc_id);
         return;
     }
 
@@ -631,14 +581,14 @@ void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *ch
         }
 
         if (interactive) {
-            printf(COLOR_LAVENDER COLOR_BOLD "📄 Document #%lld: %s" COLOR_RESET " " COLOR_PEACH
-                                             "[Page %d/%d] (%d chunks total)" COLOR_RESET "\n",
-                   (long long)doc_id, fname, current_page + 1, total_pages, count);
+            ui_printf(STYLE_HEADING "📄 Document #%lld: %s" STYLE_RESET " " STYLE_PROGRESS
+                                    "[Page %d/%d] (%d chunks total)" STYLE_RESET "\n",
+                      (long long)doc_id, fname, current_page + 1, total_pages, count);
         } else if (current_page == 0) {
-            printf(COLOR_LAVENDER COLOR_BOLD "📄 Document #%lld: %s" COLOR_RESET " " COLOR_PEACH
-                                             "(%d chunks total)" COLOR_RESET "\n",
-                   (long long)doc_id, fname, count);
-            printf("   " COLOR_GRAY "%s" COLOR_RESET "\n\n", disp_path);
+            ui_printf(STYLE_HEADING "📄 Document #%lld: %s" STYLE_RESET " " STYLE_PROGRESS
+                                    "(%d chunks total)" STYLE_RESET "\n",
+                      (long long)doc_id, fname, count);
+            ui_printf("   " STYLE_NOTE "%s" STYLE_RESET "\n\n", disp_path);
         }
 
         for (int i = start; i < end; i++) {
@@ -646,18 +596,18 @@ void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *ch
             char snippet[128];
             format_snippet(c->content, snippet, sizeof(snippet));
 
-            printf("  " COLOR_BLUE COLOR_BOLD "#%-3d" COLOR_RESET " " COLOR_PEACH
-                   "(%3dw)" COLOR_RESET " " COLOR_GRAY "\"%s\"" COLOR_RESET "\n",
-                   c->chunk_idx, c->word_count, snippet);
+            ui_printf("  " STYLE_INFO "#%-3d" STYLE_RESET " " STYLE_PROGRESS "(%3dw)" STYLE_RESET
+                      " " STYLE_NOTE "\"%s\"" STYLE_RESET "\n",
+                      c->chunk_idx, c->word_count, snippet);
         }
 
         if (!interactive) {
             break;
         }
 
-        printf("\n" COLOR_BLUE
-               "── [Page %d/%d] (Enter/n: next, p: prev, q: quit, 1-%d: page): " COLOR_RESET,
-               current_page + 1, total_pages, total_pages);
+        ui_printf("\n" STYLE_INFO
+                  "── [Page %d/%d] (Enter/n: next, p: prev, q: quit, 1-%d: page): " STYLE_RESET,
+                  current_page + 1, total_pages, total_pages);
         fflush(stdout);
 
         char line[64];
@@ -682,7 +632,7 @@ void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *ch
             if (current_page + 1 < total_pages) {
                 current_page++;
             } else {
-                printf(COLOR_GRAY "Reached end of chunks." COLOR_RESET "\n\n");
+                ui_printf(STYLE_NOTE "Reached end of chunks." STYLE_RESET "\n\n");
                 break;
             }
         } else if (isdigit((unsigned char)*t)) {
@@ -694,9 +644,10 @@ void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *ch
     }
 
     if (!interactive && show_count < count) {
-        printf("\n" COLOR_GRAY
-               "  ... and %d more chunks (specify limit, e.g. `/chunks %lld %d`)" COLOR_RESET "\n",
-               count - show_count, (long long)doc_id, count);
+        ui_printf("\n" STYLE_NOTE
+                  "  ... and %d more chunks (specify limit, e.g. `/chunks %lld %d`)" STYLE_RESET
+                  "\n",
+                  count - show_count, (long long)doc_id, count);
     }
     printf("\n");
 }
@@ -705,7 +656,7 @@ void ui_info(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    printf(COLOR_BLUE "ℹ " COLOR_RESET);
+    ui_printf(STYLE_INFO "ℹ " STYLE_RESET);
     vprintf(fmt, args);
     printf("\n");
     va_end(args);
@@ -715,7 +666,7 @@ void ui_success(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    printf(COLOR_MINT "✔ " COLOR_RESET);
+    ui_printf(STYLE_SUCCESS "✔ " STYLE_RESET);
     vprintf(fmt, args);
     printf("\n");
     va_end(args);
@@ -725,7 +676,7 @@ void ui_warn(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    printf(COLOR_PEACH "⚠ " COLOR_RESET);
+    ui_printf(STYLE_PROGRESS "⚠ " STYLE_RESET);
     vprintf(fmt, args);
     printf("\n");
     va_end(args);
@@ -735,7 +686,7 @@ void ui_error(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    printf(COLOR_RED "✘ " COLOR_RESET);
+    ui_printf(STYLE_ERROR "✘ " STYLE_RESET);
     vprintf(fmt, args);
     printf("\n");
     va_end(args);
@@ -743,7 +694,7 @@ void ui_error(const char *fmt, ...)
 
 bool ui_confirm(const char *prompt)
 {
-    printf(COLOR_PEACH COLOR_BOLD "⚠ %s " COLOR_RESET, prompt);
+    ui_printf(STYLE_PROGRESS "⚠ %s " STYLE_RESET, prompt);
     fflush(stdout);
 
     char buf[64] = {0};

@@ -400,7 +400,8 @@ char *doc_extract_docx_text(const char *path)
         return NULL;
     }
     size_t uncomp_sz = 0;
-    char *xml = (char *)mz_zip_reader_extract_file_to_heap(&zip, "word/document.xml", &uncomp_sz, 0);
+    char *xml =
+        (char *)mz_zip_reader_extract_file_to_heap(&zip, "word/document.xml", &uncomp_sz, 0);
     mz_zip_reader_end(&zip);
     if (!xml) {
         return NULL;
@@ -567,7 +568,8 @@ static char *doc_extract_pdf_stream_fallback(const char *path)
 
         /* Check if preceded by /FlateDecode */
         const char *dict_start = s > raw + 256 ? s - 256 : raw;
-        bool is_flate = (strstr(dict_start, "/FlateDecode") != NULL && strstr(dict_start, "/FlateDecode") < s);
+        bool is_flate =
+            (strstr(dict_start, "/FlateDecode") != NULL && strstr(dict_start, "/FlateDecode") < s);
 
         const char *decomp = NULL;
         size_t decomp_len = 0;
@@ -576,8 +578,9 @@ static char *doc_extract_pdf_stream_fallback(const char *path)
         if (is_flate && s_len > 2) {
             mz_ulong uncomp_len = (mz_ulong)(s_len * 10 + 4096);
             flate_buf = malloc(uncomp_len);
-            if (flate_buf && mz_uncompress((unsigned char *)flate_buf, &uncomp_len,
-                                           (const unsigned char *)s_data, (mz_ulong)s_len) == MZ_OK) {
+            if (flate_buf &&
+                mz_uncompress((unsigned char *)flate_buf, &uncomp_len,
+                              (const unsigned char *)s_data, (mz_ulong)s_len) == MZ_OK) {
                 decomp = flate_buf;
                 decomp_len = uncomp_len;
             }

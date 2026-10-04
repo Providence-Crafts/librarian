@@ -114,7 +114,8 @@ int logger_init(const char *log_path)
     dir_buf[sizeof(dir_buf) - 1] = '\0';
     char *last_slash = strrchr(dir_buf, '/');
 #if defined(_WIN32)
-    if (!last_slash) last_slash = strrchr(dir_buf, '\\');
+    if (!last_slash)
+        last_slash = strrchr(dir_buf, '\\');
 #endif
     if (last_slash) {
         *last_slash = '\0';

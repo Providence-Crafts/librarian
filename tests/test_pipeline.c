@@ -55,7 +55,8 @@ const char *test_pipeline_concurrent_ingest(void)
     char *paths[4] = {f1, f2, f3, (char *)f4};
     int docs = 0, chunks = 0, skipped = 0, failed = 0;
 
-    int rc = pipeline_ingest_files(db, emb, paths, 4, 1024, 250, 40, &docs, &chunks, &skipped, &failed);
+    int rc =
+        pipeline_ingest_files(db, emb, paths, 4, 1024, 250, 40, &docs, &chunks, &skipped, &failed);
     mu_assert("pipeline_ingest_files failed", rc == 0);
     mu_assert("docs should be 3", docs == 3);
     mu_assert("chunks should be >= 3", chunks >= 3);

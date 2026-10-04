@@ -17,8 +17,8 @@
 #include <time.h>
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 #include <io.h>
+#include <windows.h>
 #define isatty _isatty
 #define fileno _fileno
 #else
@@ -144,9 +144,9 @@ static int ingest_path(db_context_t *db, embedder_context_t *emb, const char *ra
         return 0;
     }
 
-    int rc = pipeline_ingest_files(db, emb, files.paths, files.count, dim, chunk_size,
-                                   chunk_overlap, total_docs, total_chunks, total_skipped,
-                                   total_failed);
+    int rc =
+        pipeline_ingest_files(db, emb, files.paths, files.count, dim, chunk_size, chunk_overlap,
+                              total_docs, total_chunks, total_skipped, total_failed);
     file_list_free(&files);
     return rc;
 }
@@ -234,27 +234,34 @@ static void run_query_core(db_context_t *db, embedder_context_t *emb, generator_
 
 static void show_setup_walkthrough(void)
 {
-    printf("\n" COLOR_LAVENDER COLOR_BOLD "✨ Librarian Quick Start Walkthrough:" COLOR_RESET "\n\n");
+    printf("\n" COLOR_LAVENDER COLOR_BOLD "✨ Librarian Quick Start Walkthrough:" COLOR_RESET
+           "\n\n");
     printf(COLOR_BOLD "1. Ingest your books and notes:" COLOR_RESET "\n");
     printf("   " COLOR_MINT "librarian ingest ~/Documents/my_library/" COLOR_RESET "\n");
-    printf("   " COLOR_GRAY "Indexes PDF, EPUB, DOCX, ODT, HTML, Markdown, and plain text files.\n" COLOR_RESET);
-    printf("   " COLOR_GRAY "Completely self-contained pure C99 engine with zero runtime dependencies.\n\n" COLOR_RESET);
+    printf("   " COLOR_GRAY
+           "Indexes PDF, EPUB, DOCX, ODT, HTML, Markdown, and plain text files.\n" COLOR_RESET);
+    printf("   " COLOR_GRAY "Completely self-contained pure C99 engine with zero runtime "
+           "dependencies.\n\n" COLOR_RESET);
 
     printf(COLOR_BOLD "2. Search and explore your library:" COLOR_RESET "\n");
     printf("   " COLOR_MINT "librarian docs" COLOR_RESET "\n");
     printf("   " COLOR_GRAY "Lists all indexed documents with IDs and chunk counts.\n" COLOR_RESET);
     printf("   " COLOR_MINT "librarian chunks 1" COLOR_RESET "\n");
-    printf("   " COLOR_GRAY "Inspects the individual chunks and quotes that make up document #1.\n\n" COLOR_RESET);
+    printf("   " COLOR_GRAY
+           "Inspects the individual chunks and quotes that make up document #1.\n\n" COLOR_RESET);
 
     printf(COLOR_BOLD "3. Ask questions with verified citations:" COLOR_RESET "\n");
     printf("   " COLOR_MINT "librarian query \"What is quantum annealing?\"" COLOR_RESET "\n");
-    printf("   " COLOR_GRAY "Synthesizes answers grounded strictly in your indexed library.\n\n" COLOR_RESET);
+    printf("   " COLOR_GRAY
+           "Synthesizes answers grounded strictly in your indexed library.\n\n" COLOR_RESET);
 
     printf(COLOR_BOLD "4. Interactive Chat Session:" COLOR_RESET "\n");
     printf("   " COLOR_MINT "librarian chat" COLOR_RESET "\n");
-    printf("   " COLOR_GRAY "Interactive shell with auto-completion, live /docs, /chunks, /ingest, and /help.\n\n" COLOR_RESET);
+    printf("   " COLOR_GRAY "Interactive shell with auto-completion, live /docs, /chunks, /ingest, "
+           "and /help.\n\n" COLOR_RESET);
 
-    printf(COLOR_PEACH "💡 Tip: You can re-run this setup anytime with `librarian setup` or `/setup` in chat.\n" COLOR_RESET "\n");
+    printf(COLOR_PEACH "💡 Tip: You can re-run this setup anytime with `librarian setup` or "
+                       "`/setup` in chat.\n" COLOR_RESET "\n");
 }
 
 static int download_file(const char *url, const char *dest_path)
@@ -264,7 +271,8 @@ static int download_file(const char *url, const char *dest_path)
     dir[sizeof(dir) - 1] = '\0';
     char *slash = strrchr(dir, '/');
 #if defined(_WIN32)
-    if (!slash) slash = strrchr(dir, '\\');
+    if (!slash)
+        slash = strrchr(dir, '\\');
 #endif
     if (slash) {
         *slash = '\0';
@@ -280,7 +288,8 @@ static int download_file(const char *url, const char *dest_path)
     }
 
     char curl_cmd[2048];
-    snprintf(curl_cmd, sizeof(curl_cmd), "curl -L --progress-bar -C - \"%s\" -o \"%s\"", url, dest_path);
+    snprintf(curl_cmd, sizeof(curl_cmd), "curl -L --progress-bar -C - \"%s\" -o \"%s\"", url,
+             dest_path);
     printf(COLOR_BLUE "⬇ Downloading %s..." COLOR_RESET "\n", dest_path);
     int rc = system(curl_cmd);
     if (rc != 0) {
@@ -292,12 +301,15 @@ static int download_file(const char *url, const char *dest_path)
 
 static int subcmd_setup(librarian_config_t *cfg, bool force)
 {
-    printf(COLOR_LAVENDER COLOR_BOLD "\n╔═══════════════════════════════════════════════════════════════════════╗\n");
+    printf(COLOR_LAVENDER COLOR_BOLD
+           "\n╔═══════════════════════════════════════════════════════════════════════╗\n");
     printf("║                    Librarian Automated Setup                          ║\n");
-    printf("╚═══════════════════════════════════════════════════════════════════════╝\n" COLOR_RESET "\n");
+    printf("╚═══════════════════════════════════════════════════════════════════════╝\n" COLOR_RESET
+           "\n");
 
     if (system("curl --version >/dev/null 2>&1") != 0) {
-        ui_error("curl was not found in PATH. Please install curl to download models automatically.");
+        ui_error(
+            "curl was not found in PATH. Please install curl to download models automatically.");
         return 1;
     }
 
@@ -312,8 +324,8 @@ static int subcmd_setup(librarian_config_t *cfg, bool force)
         }
     }
     if (download_emb) {
-        const char *embed_url =
-            "https://huggingface.co/SuperPauly/harrier-oss-v1-0.6b-gguf/resolve/main/harrier-oss-v1-0.6b.Q8_0.gguf";
+        const char *embed_url = "https://huggingface.co/SuperPauly/harrier-oss-v1-0.6b-gguf/"
+                                "resolve/main/harrier-oss-v1-0.6b.Q8_0.gguf";
         if (download_file(embed_url, cfg->embed_model_path) != 0) {
             return 1;
         }
@@ -330,8 +342,8 @@ static int subcmd_setup(librarian_config_t *cfg, bool force)
         }
     }
     if (download_gen) {
-        const char *gen_url =
-            "https://huggingface.co/openbmb/MiniCPM-2B-dpo-bf16-gguf/resolve/main/MiniCPM-2B-dpo-bf16.Q8_0.gguf";
+        const char *gen_url = "https://huggingface.co/openbmb/MiniCPM-2B-dpo-bf16-gguf/resolve/"
+                              "main/MiniCPM-2B-dpo-bf16.Q8_0.gguf";
         if (download_file(gen_url, cfg->gen_model_path) != 0) {
             return 1;
         }
@@ -346,20 +358,24 @@ static int check_or_setup_models(librarian_config_t *cfg, bool need_generator)
 {
     struct stat st;
     bool emb_missing = (stat(cfg->embed_model_path, &st) != 0 || st.st_size < 1000000);
-    bool gen_missing = need_generator && (stat(cfg->gen_model_path, &st) != 0 || st.st_size < 1000000);
+    bool gen_missing =
+        need_generator && (stat(cfg->gen_model_path, &st) != 0 || st.st_size < 1000000);
 
     if (emb_missing || gen_missing) {
         if (isatty(fileno(stdin))) {
             ui_warn("Required GGUF model files were not found on disk.");
-            if (ui_confirm("Would you like to run automated setup to download default models from Hugging Face? [Y/n]:")) {
+            if (ui_confirm("Would you like to run automated setup to download default models from "
+                           "Hugging Face? [Y/n]:")) {
                 return subcmd_setup(cfg, false);
             }
         }
         if (emb_missing) {
-            ui_error("Missing embedding model at '%s'. Run 'librarian setup' to download.", cfg->embed_model_path);
+            ui_error("Missing embedding model at '%s'. Run 'librarian setup' to download.",
+                     cfg->embed_model_path);
         }
         if (gen_missing) {
-            ui_error("Missing generator model at '%s'. Run 'librarian setup' to download.", cfg->gen_model_path);
+            ui_error("Missing generator model at '%s'. Run 'librarian setup' to download.",
+                     cfg->gen_model_path);
         }
         return -1;
     }
@@ -406,9 +422,10 @@ static int run_ingest_mode(librarian_config_t *cfg, const char *path)
 
     if (docs > 0) {
         if (skipped > 0) {
-            ui_success("Ingestion complete: %d new documents (%d chunks), %d unchanged files skipped "
-                       "(⏱ %.2fs)",
-                       docs, chunks, skipped, t_end - t_start);
+            ui_success(
+                "Ingestion complete: %d new documents (%d chunks), %d unchanged files skipped "
+                "(⏱ %.2fs)",
+                docs, chunks, skipped, t_end - t_start);
         } else {
             ui_success("Ingestion complete: %d documents, %d total chunks stored (⏱ %.2fs)", docs,
                        chunks, t_end - t_start);
@@ -818,8 +835,9 @@ static int run_chat_mode(const librarian_config_t *initial_cfg)
                 ui_info("Ingesting: %s", target_clean);
                 double t0 = get_time_sec();
                 int docs = 0, chunks = 0, skipped = 0, failed = 0;
-                int rc = ingest_path(db, emb, target_clean, cfg.embed_dimension, cfg.chunk_size_words,
-                                     cfg.chunk_overlap_words, &docs, &chunks, &skipped, &failed);
+                int rc =
+                    ingest_path(db, emb, target_clean, cfg.embed_dimension, cfg.chunk_size_words,
+                                cfg.chunk_overlap_words, &docs, &chunks, &skipped, &failed);
                 double t1 = get_time_sec();
 
                 if (rc != 0) {
@@ -827,15 +845,17 @@ static int run_chat_mode(const librarian_config_t *initial_cfg)
                 }
 
                 if (failed > 0) {
-                    ui_warn("Could not extract text from %d file(s) (empty, unsupported, or scanned image)",
+                    ui_warn("Could not extract text from %d file(s) (empty, unsupported, or "
+                            "scanned image)",
                             failed);
                 }
 
                 if (docs > 0) {
                     if (skipped > 0) {
-                        ui_success("Ingested %d new documents (%d chunks), %d unchanged files skipped "
-                                   "(⏱ %.2fs)",
-                                   docs, chunks, skipped, t1 - t0);
+                        ui_success(
+                            "Ingested %d new documents (%d chunks), %d unchanged files skipped "
+                            "(⏱ %.2fs)",
+                            docs, chunks, skipped, t1 - t0);
                     } else {
                         ui_success("Ingested %d documents, %d total chunks (⏱ %.2fs)", docs, chunks,
                                    t1 - t0);
@@ -844,8 +864,8 @@ static int run_chat_mode(const librarian_config_t *initial_cfg)
                     ui_info("No new documents ingested: %d unchanged files skipped (⏱ %.2fs)",
                             skipped, t1 - t0);
                 } else if (failed > 0) {
-                    ui_warn("Ingested 0 documents (%d file(s) failed extraction) (⏱ %.2fs)",
-                            failed, t1 - t0);
+                    ui_warn("Ingested 0 documents (%d file(s) failed extraction) (⏱ %.2fs)", failed,
+                            t1 - t0);
                 } else {
                     ui_warn("Ingested 0 documents (⏱ %.2fs)", t1 - t0);
                 }
@@ -920,11 +940,11 @@ static int run_docs_mode(const librarian_config_t *cfg, const char *search_patte
     return rc;
 }
 
-static int run_chunks_mode(const librarian_config_t *cfg, const char *target,
-                           const char *limit_str)
+static int run_chunks_mode(const librarian_config_t *cfg, const char *target, const char *limit_str)
 {
     if (!target) {
-        ui_error("Missing document ID or pattern. Usage: librarian chunks <doc_id|pattern> [limit]");
+        ui_error(
+            "Missing document ID or pattern. Usage: librarian chunks <doc_id|pattern> [limit]");
         return 1;
     }
 

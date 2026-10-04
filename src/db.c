@@ -29,7 +29,8 @@ static void ensure_dir_exists(const char *file_path)
     tmp[sizeof(tmp) - 1] = '\0';
     char *slash = strrchr(tmp, '/');
 #if defined(_WIN32)
-    if (!slash) slash = strrchr(tmp, '\\');
+    if (!slash)
+        slash = strrchr(tmp, '\\');
 #endif
     if (slash) {
         *slash = '\0';
@@ -547,18 +548,17 @@ int db_list_documents(db_context_t *db, const char *search_pattern, doc_info_t *
     *out_count = 0;
 
     bool has_filter = (search_pattern && search_pattern[0] != '\0');
-    const char *sql = has_filter
-                          ? "SELECT d.id, d.path, COALESCE(d.content_hash, ''), COUNT(c.id) "
-                            "FROM documents d "
-                            "LEFT JOIN chunks c ON c.doc_id = d.id "
-                            "WHERE d.path LIKE ? "
-                            "GROUP BY d.id, d.path, d.content_hash "
-                            "ORDER BY d.id ASC;"
-                          : "SELECT d.id, d.path, COALESCE(d.content_hash, ''), COUNT(c.id) "
-                            "FROM documents d "
-                            "LEFT JOIN chunks c ON c.doc_id = d.id "
-                            "GROUP BY d.id, d.path, d.content_hash "
-                            "ORDER BY d.id ASC;";
+    const char *sql = has_filter ? "SELECT d.id, d.path, COALESCE(d.content_hash, ''), COUNT(c.id) "
+                                   "FROM documents d "
+                                   "LEFT JOIN chunks c ON c.doc_id = d.id "
+                                   "WHERE d.path LIKE ? "
+                                   "GROUP BY d.id, d.path, d.content_hash "
+                                   "ORDER BY d.id ASC;"
+                                 : "SELECT d.id, d.path, COALESCE(d.content_hash, ''), COUNT(c.id) "
+                                   "FROM documents d "
+                                   "LEFT JOIN chunks c ON c.doc_id = d.id "
+                                   "GROUP BY d.id, d.path, d.content_hash "
+                                   "ORDER BY d.id ASC;";
 
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(db->handle, sql, -1, &stmt, NULL) != SQLITE_OK) {

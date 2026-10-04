@@ -141,7 +141,8 @@ const char *test_doc_git_lfs_and_html(void)
     /* Test 1: HTML text extraction */
     const char *sample_html =
         "<html><head><script>console.log('secret');</script><style>p { color: red; }</style></head>"
-        "<body><h1>Librarian Engine</h1><p>Knowledge is &quot;power&quot; &amp; freedom &nbsp;!</p></body></html>";
+        "<body><h1>Librarian Engine</h1><p>Knowledge is &quot;power&quot; &amp; freedom "
+        "&nbsp;!</p></body></html>";
     char *html_text = doc_extract_html_text(sample_html);
     mu_assert("html_text not null", html_text != NULL);
     mu_assert("script was stripped", strstr(html_text, "console.log") == NULL);

@@ -29,7 +29,8 @@ char *doc_extract_epub_text(const char *path);
    Returns dynamically allocated string (caller must free), or NULL if unsupported/failed. */
 char *doc_extract_text(const char *file_path);
 
-/* Cleans, unquotes, unescapes, trims trailing/leading whitespace, and expands '~' home directory. */
+/* Cleans, unquotes, unescapes, trims trailing/leading whitespace, and expands '~' home directory.
+ */
 void doc_clean_path(const char *in, char *out, size_t out_sz);
 
 #endif /* LIBRARIAN_DOC_H */

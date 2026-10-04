@@ -131,7 +131,8 @@ const char *test_db_lifecycle_and_knn(void)
     db_free_doc_info(docs, doc_count_listed);
 
     rc = db_list_documents(db, "nonexistent", &docs, &doc_count_listed);
-    mu_assert("db_list_documents with nonexistent filter should return 0", rc == 0 && doc_count_listed == 0);
+    mu_assert("db_list_documents with nonexistent filter should return 0",
+              rc == 0 && doc_count_listed == 0);
     db_free_doc_info(docs, doc_count_listed);
 
     /* Test db_get_document_chunks */

@@ -278,8 +278,7 @@ static void *pipeline_worker_thread(void *arg)
         }
 
         /* 5. Chunk text */
-        doc.chunks = chunk_text(content,
-                                shared->chunk_size > 0 ? shared->chunk_size : 250,
+        doc.chunks = chunk_text(content, shared->chunk_size > 0 ? shared->chunk_size : 250,
                                 shared->chunk_overlap > 0 ? shared->chunk_overlap : 40);
         free(content);
 
@@ -302,8 +301,7 @@ static void *pipeline_worker_thread(void *arg)
 
 int pipeline_ingest_files(db_context_t *db, embedder_context_t *emb, char **file_paths,
                           size_t file_count, int embed_dim, int chunk_size, int chunk_overlap,
-                          int *total_docs, int *total_chunks, int *total_skipped,
-                          int *total_failed)
+                          int *total_docs, int *total_chunks, int *total_skipped, int *total_failed)
 {
     if (!db || !emb || !file_paths || file_count == 0) {
         return 0;
@@ -410,8 +408,8 @@ int pipeline_ingest_files(db_context_t *db, embedder_context_t *emb, char **file
                 int64_t doc_id = db_insert_document_with_hash(db, doc.path, doc.hash_str);
                 if (doc_id > 0) {
                     float **vecs = (float **)malloc(sizeof(float *) * (size_t)doc.chunks.count);
-                    float *vec_pool =
-                        (float *)malloc(sizeof(float) * (size_t)doc.chunks.count * (size_t)embed_dim);
+                    float *vec_pool = (float *)malloc(sizeof(float) * (size_t)doc.chunks.count *
+                                                      (size_t)embed_dim);
                     if (vecs && vec_pool) {
                         for (int c = 0; c < doc.chunks.count; c++) {
                             vecs[c] = vec_pool + (size_t)c * (size_t)embed_dim;

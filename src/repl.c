@@ -13,8 +13,8 @@
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <direct.h>
-#include <windows.h>
 #include <io.h>
+#include <windows.h>
 #ifndef STDIN_FILENO
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
@@ -476,10 +476,9 @@ static void generate_candidates(const char *buf, size_t cursor, candidate_list_t
         }
     } else {
         /* Specific prefix typed: check all commands including /quit */
-        static const char *all_commands[] = {"/help",   "/docs",   "/chunks ", "/ingest ",
-                                             "/stats",  "/config", "/setup",   "/reset",
-                                             "/reload", "/debug",  "/clear",   "/exit",
-                                             "/quit"};
+        static const char *all_commands[] = {"/help",   "/docs",  "/chunks ", "/ingest ", "/stats",
+                                             "/config", "/setup", "/reset",   "/reload",  "/debug",
+                                             "/clear",  "/exit",  "/quit"};
         static const size_t num_all = sizeof(all_commands) / sizeof(all_commands[0]);
 
         for (size_t i = 0; i < num_all; i++) {
@@ -747,7 +746,8 @@ void repl_history_add(repl_context_t *repl, const char *line)
         dir_buf[sizeof(dir_buf) - 1] = '\0';
         char *slash = strrchr(dir_buf, '/');
 #if defined(_WIN32)
-        if (!slash) slash = strrchr(dir_buf, '\\');
+        if (!slash)
+            slash = strrchr(dir_buf, '\\');
 #endif
         if (slash) {
             *slash = '\0';

@@ -7,8 +7,8 @@
 #include <string.h>
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 #include <io.h>
+#include <windows.h>
 #ifndef STDIN_FILENO
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
@@ -441,17 +441,18 @@ void ui_list_documents(const doc_info_t *docs, int count, const char *search_pat
                    search_pattern);
         } else {
             printf(COLOR_PEACH "No documents currently indexed in the knowledge base." COLOR_RESET
-                   "\n\n");
+                               "\n\n");
         }
         return;
     }
 
     if (search_pattern && search_pattern[0] != '\0') {
         printf(COLOR_LAVENDER COLOR_BOLD "🗂 Indexed Documents (%d matching '%s'):" COLOR_RESET
-               "\n",
+                                         "\n",
                count, search_pattern);
     } else {
-        printf(COLOR_LAVENDER COLOR_BOLD "🗂 Indexed Documents (%d total):" COLOR_RESET "\n", count);
+        printf(COLOR_LAVENDER COLOR_BOLD "🗂 Indexed Documents (%d total):" COLOR_RESET "\n",
+               count);
     }
 
     const char *home = getenv("HOME");
@@ -470,18 +471,23 @@ void ui_list_documents(const doc_info_t *docs, int count, const char *search_pat
 
         if (interactive) {
             if (search_pattern && search_pattern[0] != '\0') {
-                printf(COLOR_LAVENDER COLOR_BOLD "🗂 Indexed Documents [Page %d/%d] (%d matching '%s'):" COLOR_RESET "\n",
+                printf(COLOR_LAVENDER COLOR_BOLD
+                       "🗂 Indexed Documents [Page %d/%d] (%d matching '%s'):" COLOR_RESET "\n",
                        current_page + 1, total_pages, count, search_pattern);
             } else {
-                printf(COLOR_LAVENDER COLOR_BOLD "🗂 Indexed Documents [Page %d/%d] (%d total):" COLOR_RESET "\n",
+                printf(COLOR_LAVENDER COLOR_BOLD
+                       "🗂 Indexed Documents [Page %d/%d] (%d total):" COLOR_RESET "\n",
                        current_page + 1, total_pages, count);
             }
         } else if (current_page == 0) {
             if (search_pattern && search_pattern[0] != '\0') {
-                printf(COLOR_LAVENDER COLOR_BOLD "🗂 Indexed Documents (%d matching '%s'):" COLOR_RESET "\n",
+                printf(COLOR_LAVENDER COLOR_BOLD
+                       "🗂 Indexed Documents (%d matching '%s'):" COLOR_RESET "\n",
                        count, search_pattern);
             } else {
-                printf(COLOR_LAVENDER COLOR_BOLD "🗂 Indexed Documents (%d total):" COLOR_RESET "\n", count);
+                printf(COLOR_LAVENDER COLOR_BOLD "🗂 Indexed Documents (%d total):" COLOR_RESET
+                                                 "\n",
+                       count);
             }
         }
 
@@ -515,8 +521,8 @@ void ui_list_documents(const doc_info_t *docs, int count, const char *search_pat
             const char *slash = strrchr(disp_path, '/');
             const char *fname = slash ? slash + 1 : disp_path;
 
-            printf("  " COLOR_BLUE COLOR_BOLD "#%-4lld" COLOR_RESET " " COLOR_PEACH "[%3d chunks]" COLOR_RESET
-                   " " COLOR_LAVENDER COLOR_BOLD "%s" COLOR_RESET "\n",
+            printf("  " COLOR_BLUE COLOR_BOLD "#%-4lld" COLOR_RESET " " COLOR_PEACH
+                   "[%3d chunks]" COLOR_RESET " " COLOR_LAVENDER COLOR_BOLD "%s" COLOR_RESET "\n",
                    (long long)d->id, d->chunk_count, fname);
             printf("         " COLOR_GRAY "%s" COLOR_RESET "\n", disp_path);
         }
@@ -525,7 +531,8 @@ void ui_list_documents(const doc_info_t *docs, int count, const char *search_pat
             break;
         }
 
-        printf("\n" COLOR_BLUE "── [Page %d/%d] (Enter/n: next, p: prev, q: quit, 1-%d: page): " COLOR_RESET,
+        printf("\n" COLOR_BLUE
+               "── [Page %d/%d] (Enter/n: next, p: prev, q: quit, 1-%d: page): " COLOR_RESET,
                current_page + 1, total_pages, total_pages);
         fflush(stdout);
 
@@ -560,11 +567,13 @@ void ui_list_documents(const doc_info_t *docs, int count, const char *search_pat
             }
         }
     }
-    printf("\n" COLOR_GRAY "💡 Tip: Inspect chunks with `/chunks <ID>` or `./bin/librarian chunks <ID>`" COLOR_RESET "\n\n");
+    printf("\n" COLOR_GRAY
+           "💡 Tip: Inspect chunks with `/chunks <ID>` or `./bin/librarian chunks <ID>`" COLOR_RESET
+           "\n\n");
 }
 
-void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *chunks,
-                    int count, int limit)
+void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *chunks, int count,
+                    int limit)
 {
     if (!chunks || count == 0) {
         printf(COLOR_PEACH "No chunks found for document #%lld." COLOR_RESET "\n\n",
@@ -620,11 +629,11 @@ void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *ch
 
         if (interactive) {
             printf(COLOR_LAVENDER COLOR_BOLD "📄 Document #%lld: %s" COLOR_RESET " " COLOR_PEACH
-                   "[Page %d/%d] (%d chunks total)" COLOR_RESET "\n",
+                                             "[Page %d/%d] (%d chunks total)" COLOR_RESET "\n",
                    (long long)doc_id, fname, current_page + 1, total_pages, count);
         } else if (current_page == 0) {
             printf(COLOR_LAVENDER COLOR_BOLD "📄 Document #%lld: %s" COLOR_RESET " " COLOR_PEACH
-                   "(%d chunks total)" COLOR_RESET "\n",
+                                             "(%d chunks total)" COLOR_RESET "\n",
                    (long long)doc_id, fname, count);
             printf("   " COLOR_GRAY "%s" COLOR_RESET "\n\n", disp_path);
         }
@@ -634,8 +643,8 @@ void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *ch
             char snippet[128];
             format_snippet(c->content, snippet, sizeof(snippet));
 
-            printf("  " COLOR_BLUE COLOR_BOLD "#%-3d" COLOR_RESET " " COLOR_PEACH "(%3dw)" COLOR_RESET
-                   " " COLOR_GRAY "\"%s\"" COLOR_RESET "\n",
+            printf("  " COLOR_BLUE COLOR_BOLD "#%-3d" COLOR_RESET " " COLOR_PEACH
+                   "(%3dw)" COLOR_RESET " " COLOR_GRAY "\"%s\"" COLOR_RESET "\n",
                    c->chunk_idx, c->word_count, snippet);
         }
 
@@ -643,7 +652,8 @@ void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *ch
             break;
         }
 
-        printf("\n" COLOR_BLUE "── [Page %d/%d] (Enter/n: next, p: prev, q: quit, 1-%d: page): " COLOR_RESET,
+        printf("\n" COLOR_BLUE
+               "── [Page %d/%d] (Enter/n: next, p: prev, q: quit, 1-%d: page): " COLOR_RESET,
                current_page + 1, total_pages, total_pages);
         fflush(stdout);
 

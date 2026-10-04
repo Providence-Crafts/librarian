@@ -27,8 +27,8 @@ void ui_confidence_badge(float confidence, bool is_refusal);
 void ui_similarity_badge(float similarity, float threshold);
 void ui_references(const search_result_t *results, int count, float min_threshold);
 void ui_list_documents(const doc_info_t *docs, int count, const char *search_pattern);
-void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *chunks,
-                    int count, int limit);
+void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *chunks, int count,
+                    int limit);
 bool ui_confirm(const char *prompt);
 
 #if defined(__GNUC__) || defined(__clang__)

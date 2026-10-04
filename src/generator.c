@@ -137,9 +137,11 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
         prompt, prompt_cap,
         "<|im_start|>system\n"
         "You are an accurate, honest, and direct AI knowledge assistant.\n"
-        "Answer the user's question clearly and concisely using ONLY the verified context snippets below.\n"
+        "Answer the user's question clearly and concisely using ONLY the verified context snippets "
+        "below.\n"
         "Cite sources using bracketed references like [1], [2] when stating facts from them.\n"
-        "If the context does not contain sufficient information to answer the question, or if you are unsure, "
+        "If the context does not contain sufficient information to answer the question, or if you "
+        "are unsure, "
         "you MUST respond ONLY with \"" REFUSAL_INSUFFICIENT_DATA_TOKEN "\".<|im_end|>\n"
         "<|im_start|>user\n"
         "Context:\n");

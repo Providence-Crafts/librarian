@@ -73,7 +73,8 @@ int config_save(const char *path, const librarian_config_t *cfg)
     dir[sizeof(dir) - 1] = '\0';
     char *slash = strrchr(dir, '/');
 #if defined(_WIN32)
-    if (!slash) slash = strrchr(dir, '\\');
+    if (!slash)
+        slash = strrchr(dir, '\\');
 #endif
     if (slash) {
         *slash = '\0';
@@ -86,11 +87,13 @@ int config_save(const char *path, const librarian_config_t *cfg)
     }
 
     fprintf(fp, "[database]\npath = \"%s\"\n\n", cfg->db_path);
-    fprintf(fp, "[embedder]\nmodel_path = \"%s\"\ndimension = %d\nsimilarity_threshold = %.2f\n"
-                "chunk_size_words = %d\nchunk_overlap_words = %d\n\n",
+    fprintf(fp,
+            "[embedder]\nmodel_path = \"%s\"\ndimension = %d\nsimilarity_threshold = %.2f\n"
+            "chunk_size_words = %d\nchunk_overlap_words = %d\n\n",
             cfg->embed_model_path, cfg->embed_dimension, (double)cfg->similarity_threshold,
             cfg->chunk_size_words, cfg->chunk_overlap_words);
-    fprintf(fp, "[generator]\nmodel_path = \"%s\"\ncontext_length = %d\nconfidence_threshold = %.2f\n",
+    fprintf(fp,
+            "[generator]\nmodel_path = \"%s\"\ncontext_length = %d\nconfidence_threshold = %.2f\n",
             cfg->gen_model_path, cfg->gen_context_length, (double)cfg->confidence_threshold);
 
     fclose(fp);

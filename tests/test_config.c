@@ -68,4 +68,3 @@ const char *test_config_save_and_paths(void)
     remove(tmp_toml);
     return NULL;
 }
-

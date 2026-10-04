@@ -10,6 +10,6 @@ NestedInstallerFiles:
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/Providence-Crafts/librarian/releases/download/v0.1.0/librarian-0.1.0-windows-x86_64.zip
-    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+    InstallerSha256: A0561DC30D808EC7A2303B914DC59CA17B961F8F15F5CB04EB484C4C94E8063F
 ManifestType: installer
 ManifestVersion: 1.6.0

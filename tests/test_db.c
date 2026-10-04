@@ -41,7 +41,8 @@ const char *test_db_lifecycle_and_knn(void)
     mu_assert("db_commit_transaction failed", rc == 0);
 
     /* Verify stats */
-    int doc_count = 0, chunk_count = 0;
+    int doc_count = 0;
+    int chunk_count = 0;
     rc = db_get_stats(db, &doc_count, &chunk_count);
     mu_assert("db_get_stats failed", rc == 0);
     mu_assert("doc_count should be 1", doc_count == 1);
@@ -98,7 +99,8 @@ const char *test_db_lifecycle_and_knn(void)
     rc = db_reset(db, 4);
     mu_assert("db_reset should return 0", rc == 0);
 
-    int post_reset_docs = -1, post_reset_chunks = -1;
+    int post_reset_docs = -1;
+    int post_reset_chunks = -1;
     rc = db_get_stats(db, &post_reset_docs, &post_reset_chunks);
     mu_assert("db_get_stats after reset should succeed", rc == 0);
     mu_assert("docs after reset should be 0", post_reset_docs == 0);

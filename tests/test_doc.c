@@ -10,6 +10,8 @@ const char *test_doc_extension_filtering(void);
 const char *test_doc_shell_escaping(void);
 const char *test_doc_utf8_sanitizer(void);
 const char *test_doc_text_extraction(void);
+const char *test_doc_git_lfs_and_html(void);
+const char *test_doc_clean_path(void);
 
 const char *test_doc_extension_filtering(void)
 {

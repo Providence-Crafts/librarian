@@ -7,7 +7,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#if defined(_WIN32)
+#ifdef _WIN32
 #include <direct.h>
 #define mkdir_portable(p) _mkdir(p)
 #else
@@ -20,7 +20,7 @@ int config_get_default_paths(char *config_path, size_t cfg_sz, char *data_dir, s
         return -1;
     }
 
-#if defined(_WIN32)
+#ifdef _WIN32
     const char *appdata = getenv("APPDATA");
     const char *localappdata = getenv("LOCALAPPDATA");
     if (!appdata) {
@@ -72,7 +72,7 @@ int config_save(const char *path, const librarian_config_t *cfg)
     strncpy(dir, path, sizeof(dir) - 1);
     dir[sizeof(dir) - 1] = '\0';
     char *slash = strrchr(dir, '/');
-#if defined(_WIN32)
+#ifdef _WIN32
     if (!slash)
         slash = strrchr(dir, '\\');
 #endif
@@ -102,8 +102,9 @@ int config_save(const char *path, const librarian_config_t *cfg)
 
 void config_default(librarian_config_t *cfg)
 {
-    if (!cfg)
+    if (!cfg) {
         return;
+    }
     memset(cfg, 0, sizeof(*cfg));
 
     char sys_cfg[512] = {0};
@@ -135,8 +136,23 @@ void config_default(librarian_config_t *cfg)
     cfg->confidence_threshold = 0.50f;
 }
 
+/* Copy a TOML string datum into DST (SIZE bytes, always terminated) and free
+ * it. A missing key leaves DST at its default. */
+static void take_string(char *dst, size_t size, toml_datum_t d)
+{
+    if (!d.ok || !d.u.s) {
+        return;
+    }
+    strncpy(dst, d.u.s, size - 1);
+    dst[size - 1] = '\0';
+    free(d.u.s);
+}
+
 int config_load(const char *path, librarian_config_t *cfg)
 {
+    if (!cfg) {
+        return -1;
+    }
     config_default(cfg);
 
     const char *actual_path = path;
@@ -175,22 +191,14 @@ int config_load(const char *path, librarian_config_t *cfg)
     const toml_table_t *tab_db = toml_table_in(root, "database");
     if (tab_db) {
         toml_datum_t d_path = toml_string_in(tab_db, "path");
-        if (d_path.ok) {
-            strncpy(cfg->db_path, d_path.u.s, sizeof(cfg->db_path) - 1);
-            cfg->db_path[sizeof(cfg->db_path) - 1] = '\0';
-            free(d_path.u.s);
-        }
+        take_string(cfg->db_path, sizeof(cfg->db_path), d_path);
     }
 
     /* [embedder] */
     const toml_table_t *tab_emb = toml_table_in(root, "embedder");
     if (tab_emb) {
         toml_datum_t d_path = toml_string_in(tab_emb, "model_path");
-        if (d_path.ok) {
-            strncpy(cfg->embed_model_path, d_path.u.s, sizeof(cfg->embed_model_path) - 1);
-            cfg->embed_model_path[sizeof(cfg->embed_model_path) - 1] = '\0';
-            free(d_path.u.s);
-        }
+        take_string(cfg->embed_model_path, sizeof(cfg->embed_model_path), d_path);
         toml_datum_t d_dim = toml_int_in(tab_emb, "dimension");
         if (d_dim.ok) {
             cfg->embed_dimension = (int)d_dim.u.i;
@@ -213,11 +221,7 @@ int config_load(const char *path, librarian_config_t *cfg)
     const toml_table_t *tab_gen = toml_table_in(root, "generator");
     if (tab_gen) {
         toml_datum_t d_path = toml_string_in(tab_gen, "model_path");
-        if (d_path.ok) {
-            strncpy(cfg->gen_model_path, d_path.u.s, sizeof(cfg->gen_model_path) - 1);
-            cfg->gen_model_path[sizeof(cfg->gen_model_path) - 1] = '\0';
-            free(d_path.u.s);
-        }
+        take_string(cfg->gen_model_path, sizeof(cfg->gen_model_path), d_path);
         toml_datum_t d_ctx = toml_int_in(tab_gen, "context_length");
         if (d_ctx.ok) {
             cfg->gen_context_length = (int)d_ctx.u.i;
@@ -238,11 +242,7 @@ int config_load(const char *path, librarian_config_t *cfg)
         if (!d_log.ok) {
             d_log = toml_string_in(tab_log, "path");
         }
-        if (d_log.ok) {
-            strncpy(cfg->log_path, d_log.u.s, sizeof(cfg->log_path) - 1);
-            cfg->log_path[sizeof(cfg->log_path) - 1] = '\0';
-            free(d_log.u.s);
-        }
+        take_string(cfg->log_path, sizeof(cfg->log_path), d_log);
     }
 
     toml_free(root);
@@ -251,8 +251,9 @@ int config_load(const char *path, librarian_config_t *cfg)
 
 void config_print(const librarian_config_t *cfg)
 {
-    if (!cfg)
+    if (!cfg) {
         return;
+    }
     printf("Configuration:\n");
     printf("  [database] path = %s\n", cfg->db_path);
     printf("  [logging] path = %s\n", cfg->log_path);

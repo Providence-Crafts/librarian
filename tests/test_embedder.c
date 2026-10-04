@@ -47,7 +47,7 @@ const char *test_vector_normalization(void)
     mu_assert("norm y component should be 0.8", fabsf(vec[1] - 0.8f) < 1e-5f);
     mu_assert("norm z component should be 0.0", fabsf(vec[2] - 0.0f) < 1e-5f);
 
-    float norm_sq = vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2];
+    float norm_sq = (vec[0] * vec[0]) + (vec[1] * vec[1]) + (vec[2] * vec[2]);
     mu_assert("norm should equal 1.0", fabsf(norm_sq - 1.0f) < 1e-5f);
 
     return NULL;
@@ -89,7 +89,8 @@ const char *test_embedder_model(void)
     rc = embedder_embed_batch(emb, batch_texts, bvecs, 2);
     mu_assert("embedder_embed_batch failed", rc == 0);
 
-    float bsum1 = 0.0f, bsum2 = 0.0f;
+    float bsum1 = 0.0f;
+    float bsum2 = 0.0f;
     for (int i = 0; i < 1024; i++) {
         bsum1 += bvec1[i] * bvec1[i];
         bsum2 += bvec2[i] * bvec2[i];

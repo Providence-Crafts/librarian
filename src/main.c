@@ -15,7 +15,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
-#if defined(_WIN32)
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <io.h>
 #include <windows.h>
@@ -31,7 +31,7 @@ static double get_time_sec(void)
 {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
+    return (double)ts.tv_sec + ((double)ts.tv_nsec * 1e-9);
 }
 
 typedef struct {
@@ -78,6 +78,8 @@ static void file_list_free(file_list_t *list)
     list->cap = 0;
 }
 
+/* Recursion depth is the directory depth of the tree being ingested. */
+/* NOLINTNEXTLINE(misc-no-recursion) */
 static void collect_files_recursive(const char *path, file_list_t *list)
 {
     struct stat st;
@@ -184,8 +186,9 @@ static void run_query_core(db_context_t *db, embedder_context_t *emb, generator_
         printf("\n" COLOR_PEACH
                "Stage 1 Refusal: No matching documents found in knowledge base." COLOR_RESET "\n");
         printf(COLOR_GRAY "Ingest reference documents using `/ingest <path>`." COLOR_RESET "\n\n");
-        if (results)
+        if (results) {
             db_free_results(results, count);
+        }
         return;
     }
 
@@ -264,34 +267,54 @@ static void show_setup_walkthrough(void)
                        "`/setup` in chat.\n" COLOR_RESET "\n");
 }
 
+/* Shell out to mkdir and curl. Both arguments come from the user's own config
+ * and are quoted for the platform's shell; mkdir -p and the plat layer's
+ * replacement land with the Windows port. */
 static int download_file(const char *url, const char *dest_path)
 {
     char dir[512];
     strncpy(dir, dest_path, sizeof(dir) - 1);
     dir[sizeof(dir) - 1] = '\0';
     char *slash = strrchr(dir, '/');
-#if defined(_WIN32)
-    if (!slash)
+#ifdef _WIN32
+    if (!slash) {
         slash = strrchr(dir, '\\');
+    }
 #endif
+    char cmd[4096];
     if (slash) {
         *slash = '\0';
-        char mkdir_cmd[2048];
-#if defined(_WIN32)
-        snprintf(mkdir_cmd, sizeof(mkdir_cmd), "if not exist \"%s\" mkdir \"%s\"", dir, dir);
+#ifdef _WIN32
+        snprintf(cmd, sizeof(cmd), "if not exist \"%s\" mkdir \"%s\"", dir, dir);
 #else
-        snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p \"%s\"", dir);
+        char *qdir = doc_shell_escape(dir);
+        if (!qdir) {
+            return -1;
+        }
+        snprintf(cmd, sizeof(cmd), "mkdir -p %s", qdir);
+        free(qdir);
 #endif
-        if (system(mkdir_cmd) != 0) {
-            /* Handled: Directory may already exist or will fail on fopen */
+        if (system(cmd) != 0) { /* NOLINT(cert-env33-c) */
+            logger_warn("Could not create directory '%s'; curl will report the failure", dir);
         }
     }
 
-    char curl_cmd[2048];
-    snprintf(curl_cmd, sizeof(curl_cmd), "curl -L --progress-bar -C - \"%s\" -o \"%s\"", url,
-             dest_path);
+#ifdef _WIN32
+    snprintf(cmd, sizeof(cmd), "curl -L --progress-bar -C - \"%s\" -o \"%s\"", url, dest_path);
+#else
+    char *qurl = doc_shell_escape(url);
+    char *qdest = doc_shell_escape(dest_path);
+    if (!qurl || !qdest) {
+        free(qurl);
+        free(qdest);
+        return -1;
+    }
+    snprintf(cmd, sizeof(cmd), "curl -L --progress-bar -C - %s -o %s", qurl, qdest);
+    free(qurl);
+    free(qdest);
+#endif
     printf(COLOR_BLUE "⬇ Downloading %s..." COLOR_RESET "\n", dest_path);
-    int rc = system(curl_cmd);
+    int rc = system(cmd); /* NOLINT(cert-env33-c) */
     if (rc != 0) {
         ui_error("Download failed (curl exit code %d)", rc);
         return -1;
@@ -307,7 +330,7 @@ static int subcmd_setup(librarian_config_t *cfg, bool force)
     printf("╚═══════════════════════════════════════════════════════════════════════╝\n" COLOR_RESET
            "\n");
 
-    if (system("curl --version >/dev/null 2>&1") != 0) {
+    if (system("curl --version >/dev/null 2>&1") != 0) { /* NOLINT(cert-env33-c) */
         ui_error(
             "curl was not found in PATH. Please install curl to download models automatically.");
         return 1;
@@ -390,8 +413,9 @@ static int run_ingest_mode(librarian_config_t *cfg, const char *path)
 
     ui_info("Initializing database: %s", cfg->db_path);
     db_context_t *db = db_open(cfg->db_path);
-    if (!db)
+    if (!db) {
         return 1;
+    }
 
     db_init_schema(db, cfg->embed_dimension);
 
@@ -404,7 +428,10 @@ static int run_ingest_mode(librarian_config_t *cfg, const char *path)
 
     ui_info("Ingesting path: %s (using %d threads)", path, embedder_get_thread_count(emb));
     double t_start = get_time_sec();
-    int docs = 0, chunks = 0, skipped = 0, failed = 0;
+    int docs = 0;
+    int chunks = 0;
+    int skipped = 0;
+    int failed = 0;
     int rc = ingest_path(db, emb, path, cfg->embed_dimension, cfg->chunk_size_words,
                          cfg->chunk_overlap_words, &docs, &chunks, &skipped, &failed);
     double t_end = get_time_sec();
@@ -500,8 +527,9 @@ static int run_query_mode(librarian_config_t *cfg, const char *question)
         printf(COLOR_GRAY
                "Please ingest reference documents using `librarian ingest <path>`." COLOR_RESET
                "\n\n");
-        if (results)
+        if (results) {
             db_free_results(results, count);
+        }
         embedder_free(emb);
         db_close(db);
         return 0;
@@ -649,10 +677,12 @@ static int run_chat_mode(const librarian_config_t *initial_cfg)
 
         /* Skip leading whitespace */
         char *cmd = line;
-        while (*cmd && isspace((unsigned char)*cmd))
+        while (*cmd && isspace((unsigned char)*cmd)) {
             cmd++;
-        if (*cmd == '\0')
+        }
+        if (*cmd == '\0') {
             continue;
+        }
 
         /* Add to history */
         repl_history_add(repl, cmd);
@@ -721,7 +751,8 @@ static int run_chat_mode(const librarian_config_t *initial_cfg)
         }
 
         if (strcmp(cmd, "/stats") == 0) {
-            int doc_count = 0, chunk_count = 0;
+            int doc_count = 0;
+            int chunk_count = 0;
             db_get_stats(db, &doc_count, &chunk_count);
             printf("\n" COLOR_LAVENDER COLOR_BOLD "Database Statistics:" COLOR_RESET "\n");
             printf("  • Path: %s\n", cfg.db_path);
@@ -735,10 +766,12 @@ static int run_chat_mode(const librarian_config_t *initial_cfg)
             const char *pattern = NULL;
             if (strncmp(cmd, "/docs ", 6) == 0) {
                 pattern = cmd + 6;
-                while (*pattern && isspace((unsigned char)*pattern))
+                while (*pattern && isspace((unsigned char)*pattern)) {
                     pattern++;
-                if (*pattern == '\0')
+                }
+                if (*pattern == '\0') {
                     pattern = NULL;
+                }
             }
             doc_info_t *docs = NULL;
             int count = 0;
@@ -753,8 +786,9 @@ static int run_chat_mode(const librarian_config_t *initial_cfg)
 
         if (strcmp(cmd, "/chunks") == 0 || strncmp(cmd, "/chunks ", 8) == 0) {
             const char *args = cmd + 7;
-            while (*args && isspace((unsigned char)*args))
+            while (*args && isspace((unsigned char)*args)) {
                 args++;
+            }
             if (*args == '\0') {
                 ui_warn("Usage: /chunks <doc_id|filename_pattern> [limit]");
                 continue;
@@ -768,10 +802,11 @@ static int run_chat_mode(const librarian_config_t *initial_cfg)
             long val = strtol(args, &endptr, 10);
             if (endptr != args && (*endptr == '\0' || isspace((unsigned char)*endptr))) {
                 target_doc_id = val;
-                while (*endptr && isspace((unsigned char)*endptr))
+                while (*endptr && isspace((unsigned char)*endptr)) {
                     endptr++;
+                }
                 if (*endptr) {
-                    limit = atoi(endptr);
+                    limit = (int)strtol(endptr, NULL, 10);
                 }
             } else {
                 char pat[256];
@@ -780,10 +815,11 @@ static int run_chat_mode(const librarian_config_t *initial_cfg)
                     pat[pidx++] = *args++;
                 }
                 pat[pidx] = '\0';
-                while (*args && isspace((unsigned char)*args))
+                while (*args && isspace((unsigned char)*args)) {
                     args++;
+                }
                 if (*args) {
-                    limit = atoi(args);
+                    limit = (int)strtol(args, NULL, 10);
                 }
 
                 doc_info_t *docs = NULL;
@@ -834,7 +870,10 @@ static int run_chat_mode(const librarian_config_t *initial_cfg)
             if (target_clean[0]) {
                 ui_info("Ingesting: %s", target_clean);
                 double t0 = get_time_sec();
-                int docs = 0, chunks = 0, skipped = 0, failed = 0;
+                int docs = 0;
+                int chunks = 0;
+                int skipped = 0;
+                int failed = 0;
                 int rc =
                     ingest_path(db, emb, target_clean, cfg.embed_dimension, cfg.chunk_size_words,
                                 cfg.chunk_overlap_words, &docs, &chunks, &skipped, &failed);
@@ -956,7 +995,7 @@ static int run_chunks_mode(const librarian_config_t *cfg, const char *target, co
 
     int limit = 20;
     if (limit_str && limit_str[0] != '\0') {
-        limit = atoi(limit_str);
+        limit = (int)strtol(limit_str, NULL, 10);
     }
 
     int64_t target_doc_id = -1;

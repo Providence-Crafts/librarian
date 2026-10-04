@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#if defined(_WIN32)
+#ifdef _WIN32
 #include <direct.h>
 #define mkdir_portable(p) _mkdir(p)
 #else
@@ -28,7 +28,7 @@ static void ensure_dir_exists(const char *file_path)
     strncpy(tmp, file_path, sizeof(tmp) - 1);
     tmp[sizeof(tmp) - 1] = '\0';
     char *slash = strrchr(tmp, '/');
-#if defined(_WIN32)
+#ifdef _WIN32
     if (!slash)
         slash = strrchr(tmp, '\\');
 #endif
@@ -55,22 +55,26 @@ db_context_t *db_open(const char *path)
     rc = sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "Failed to open SQLite database %s: %s\n", path, sqlite3_errmsg(db));
-        if (db)
+        if (db) {
             sqlite3_close(db);
+        }
         return NULL;
     }
 
     /* Configure SQLite performance pragmas */
     char *err = NULL;
     sqlite3_exec(db, "PRAGMA journal_mode = WAL;", NULL, NULL, &err);
-    if (err)
+    if (err) {
         sqlite3_free(err);
+    }
     sqlite3_exec(db, "PRAGMA synchronous = NORMAL;", NULL, NULL, &err);
-    if (err)
+    if (err) {
         sqlite3_free(err);
+    }
     sqlite3_exec(db, "PRAGMA foreign_keys = ON;", NULL, NULL, &err);
-    if (err)
+    if (err) {
         sqlite3_free(err);
+    }
 
     db_context_t *ctx = calloc(1, sizeof(*ctx));
     if (!ctx) {
@@ -83,8 +87,9 @@ db_context_t *db_open(const char *path)
 
 void db_close(db_context_t *db)
 {
-    if (!db)
+    if (!db) {
         return;
+    }
     if (db->handle) {
         sqlite3_close(db->handle);
     }
@@ -93,8 +98,9 @@ void db_close(db_context_t *db)
 
 int db_init_schema(db_context_t *db, int embed_dim)
 {
-    if (!db || !db->handle)
+    if (!db || !db->handle) {
         return -1;
+    }
     db->embed_dim = embed_dim;
 
     const char *sql_docs = "CREATE TABLE IF NOT EXISTS documents ("
@@ -123,8 +129,9 @@ int db_init_schema(db_context_t *db, int embed_dim)
     int rc = sqlite3_exec(db->handle, sql_docs, NULL, NULL, &err);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "Error creating documents table: %s\n", err ? err : "unknown");
-        if (err)
+        if (err) {
             sqlite3_free(err);
+        }
         return -1;
     }
 
@@ -137,16 +144,18 @@ int db_init_schema(db_context_t *db, int embed_dim)
     rc = sqlite3_exec(db->handle, sql_chunks, NULL, NULL, &err);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "Error creating chunks table: %s\n", err ? err : "unknown");
-        if (err)
+        if (err) {
             sqlite3_free(err);
+        }
         return -1;
     }
 
     rc = sqlite3_exec(db->handle, sql_vec, NULL, NULL, &err);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "Error creating vec_chunks virtual table: %s\n", err ? err : "unknown");
-        if (err)
+        if (err) {
             sqlite3_free(err);
+        }
         return -1;
     }
 
@@ -155,8 +164,9 @@ int db_init_schema(db_context_t *db, int embed_dim)
 
 int db_reset(db_context_t *db, int embed_dim)
 {
-    if (!db || !db->handle)
+    if (!db || !db->handle) {
         return -1;
+    }
 
     char *err = NULL;
     const char *sql_reset = "DROP TABLE IF EXISTS vec_chunks;\n"
@@ -181,22 +191,25 @@ int db_reset(db_context_t *db, int embed_dim)
 
 int db_begin_transaction(db_context_t *db)
 {
-    if (!db || !db->handle)
+    if (!db || !db->handle) {
         return -1;
+    }
     return sqlite3_exec(db->handle, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 }
 
 int db_commit_transaction(db_context_t *db)
 {
-    if (!db || !db->handle)
+    if (!db || !db->handle) {
         return -1;
+    }
     return sqlite3_exec(db->handle, "COMMIT;", NULL, NULL, NULL);
 }
 
 int db_rollback_transaction(db_context_t *db)
 {
-    if (!db || !db->handle)
+    if (!db || !db->handle) {
         return -1;
+    }
     return sqlite3_exec(db->handle, "ROLLBACK;", NULL, NULL, NULL);
 }
 
@@ -225,12 +238,13 @@ bool db_hash_file_fnv1a64(const char *path, char *out_hash, size_t out_hash_sz)
     uint64_t hash = 14695981039346656037ULL;
     unsigned char buf[65536];
     size_t n;
-    while ((n = fread(buf, 1, sizeof(buf), fp)) > 0) {
+    do {
+        n = fread(buf, 1, sizeof(buf), fp);
         for (size_t i = 0; i < n; i++) {
             hash ^= (uint64_t)buf[i];
             hash *= 1099511628211ULL;
         }
-    }
+    } while (n == sizeof(buf));
     fclose(fp);
 
     snprintf(out_hash, out_hash_sz, "%016llx", (unsigned long long)hash);
@@ -239,8 +253,9 @@ bool db_hash_file_fnv1a64(const char *path, char *out_hash, size_t out_hash_sz)
 
 int64_t db_insert_document_with_hash(db_context_t *db, const char *path, const char *content_hash)
 {
-    if (!db || !db->handle || !path)
+    if (!db || !db->handle || !path) {
         return -1;
+    }
 
     const char *sql_find = "SELECT id FROM documents WHERE path = ?;";
     sqlite3_stmt *stmt = NULL;
@@ -293,8 +308,9 @@ int64_t db_insert_document(db_context_t *db, const char *path)
 
 bool db_find_document_by_hash(db_context_t *db, const char *content_hash, int64_t *out_doc_id)
 {
-    if (!db || !db->handle || !content_hash)
+    if (!db || !db->handle || !content_hash) {
         return false;
+    }
 
     const char *sql = "SELECT id FROM documents WHERE content_hash = ? LIMIT 1;";
     sqlite3_stmt *stmt = NULL;
@@ -317,8 +333,9 @@ bool db_find_document_by_hash(db_context_t *db, const char *content_hash, int64_
 bool db_get_document_hash_by_path(db_context_t *db, const char *path, char *out_hash,
                                   size_t out_hash_sz)
 {
-    if (!db || !db->handle || !path || !out_hash || out_hash_sz == 0)
+    if (!db || !db->handle || !path || !out_hash || out_hash_sz == 0) {
         return false;
+    }
 
     const char *sql = "SELECT content_hash FROM documents WHERE path = ? LIMIT 1;";
     sqlite3_stmt *stmt = NULL;
@@ -342,13 +359,15 @@ bool db_get_document_hash_by_path(db_context_t *db, const char *path, char *out_
 
 int db_for_each_document_hash(db_context_t *db, db_doc_hash_cb callback, void *user_data)
 {
-    if (!db || !db->handle || !callback)
+    if (!db || !db->handle || !callback) {
         return -1;
+    }
 
     const char *sql = "SELECT path, content_hash FROM documents WHERE content_hash IS NOT NULL;";
     sqlite3_stmt *stmt = NULL;
-    if (sqlite3_prepare_v2(db->handle, sql, -1, &stmt, NULL) != SQLITE_OK)
+    if (sqlite3_prepare_v2(db->handle, sql, -1, &stmt, NULL) != SQLITE_OK) {
         return -1;
+    }
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         const char *p = (const char *)sqlite3_column_text(stmt, 0);
@@ -363,8 +382,9 @@ int db_for_each_document_hash(db_context_t *db, db_doc_hash_cb callback, void *u
 
 int db_delete_document_chunks(db_context_t *db, int64_t doc_id)
 {
-    if (!db || !db->handle || doc_id <= 0)
+    if (!db || !db->handle || doc_id <= 0) {
         return -1;
+    }
 
     const char *sql_del_vec =
         "DELETE FROM vec_chunks WHERE chunk_id IN (SELECT id FROM chunks WHERE doc_id = ?);";
@@ -388,8 +408,9 @@ int db_delete_document_chunks(db_context_t *db, int64_t doc_id)
 int db_insert_chunk(db_context_t *db, int64_t doc_id, int chunk_idx, const char *content,
                     const float *vec, int dim)
 {
-    if (!db || !db->handle || !content || !vec)
+    if (!db || !db->handle || !content || !vec) {
         return -1;
+    }
 
     const char *sql_chunk =
         "INSERT INTO chunks (doc_id, chunk_idx, content) VALUES (?, ?, ?) RETURNING id;";
@@ -429,8 +450,9 @@ int db_insert_chunk(db_context_t *db, int64_t doc_id, int chunk_idx, const char 
 int db_search_knn(db_context_t *db, const float *query_vec, int dim, int k,
                   search_result_t **out_results, int *out_count)
 {
-    if (!db || !db->handle || !query_vec || !out_results || !out_count)
+    if (!db || !db->handle || !query_vec || !out_results || !out_count) {
         return -1;
+    }
     *out_results = NULL;
     *out_count = 0;
 
@@ -499,8 +521,9 @@ int db_search_knn(db_context_t *db, const float *query_vec, int dim, int k,
 
 void db_free_results(search_result_t *results, int count)
 {
-    if (!results)
+    if (!results) {
         return;
+    }
     for (int i = 0; i < count; i++) {
         if (results[i].content) {
             free(results[i].content);
@@ -511,12 +534,15 @@ void db_free_results(search_result_t *results, int count)
 
 int db_get_stats(db_context_t *db, int *out_doc_count, int *out_chunk_count)
 {
-    if (!db || !db->handle)
+    if (!db || !db->handle) {
         return -1;
-    if (out_doc_count)
+    }
+    if (out_doc_count) {
         *out_doc_count = 0;
-    if (out_chunk_count)
+    }
+    if (out_chunk_count) {
         *out_chunk_count = 0;
+    }
 
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(db->handle, "SELECT count(*) FROM documents;", -1, &stmt, NULL) ==

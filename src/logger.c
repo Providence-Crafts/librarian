@@ -10,7 +10,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
-#if defined(_WIN32)
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <direct.h>
 #include <process.h>
@@ -113,7 +113,7 @@ int logger_init(const char *log_path)
     strncpy(dir_buf, log_path, sizeof(dir_buf) - 1);
     dir_buf[sizeof(dir_buf) - 1] = '\0';
     char *last_slash = strrchr(dir_buf, '/');
-#if defined(_WIN32)
+#ifdef _WIN32
     if (!last_slash)
         last_slash = strrchr(dir_buf, '\\');
 #endif
@@ -130,7 +130,7 @@ int logger_init(const char *log_path)
 
     struct timespec ts;
     (void)clock_gettime(CLOCK_REALTIME, &ts);
-    struct tm tm_buf;
+    struct tm tm_buf = {0};
     localtime_r(&ts.tv_sec, &tm_buf);
     char time_str[64];
     strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm_buf);
@@ -211,7 +211,7 @@ void logger_log_level(log_level_t level, const char *fmt, ...)
 
     struct timespec ts;
     (void)clock_gettime(CLOCK_REALTIME, &ts);
-    struct tm tm_buf;
+    struct tm tm_buf = {0};
     localtime_r(&ts.tv_sec, &tm_buf);
     char time_str[64];
     strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm_buf);
@@ -250,8 +250,9 @@ void logger_log(const char *fmt, ...)
 
 void logger_debug(const char *fmt, ...)
 {
-    if (!fmt)
+    if (!fmt) {
         return;
+    }
     va_list args;
     va_start(args, fmt);
     char buf[2048];
@@ -262,8 +263,9 @@ void logger_debug(const char *fmt, ...)
 
 void logger_info(const char *fmt, ...)
 {
-    if (!fmt)
+    if (!fmt) {
         return;
+    }
     va_list args;
     va_start(args, fmt);
     char buf[2048];
@@ -274,8 +276,9 @@ void logger_info(const char *fmt, ...)
 
 void logger_warn(const char *fmt, ...)
 {
-    if (!fmt)
+    if (!fmt) {
         return;
+    }
     va_list args;
     va_start(args, fmt);
     char buf[2048];
@@ -286,8 +289,9 @@ void logger_warn(const char *fmt, ...)
 
 void logger_error(const char *fmt, ...)
 {
-    if (!fmt)
+    if (!fmt) {
         return;
+    }
     va_list args;
     va_start(args, fmt);
     char buf[2048];
@@ -311,7 +315,7 @@ void logger_close(void)
     if (g_log_fp) {
         struct timespec ts;
         (void)clock_gettime(CLOCK_REALTIME, &ts);
-        struct tm tm_buf;
+        struct tm tm_buf = {0};
         localtime_r(&ts.tv_sec, &tm_buf);
         char time_str[64];
         strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm_buf);

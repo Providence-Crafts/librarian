@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if defined(_WIN32)
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
@@ -23,8 +23,9 @@ struct embedder_context {
 
 void vector_normalize_l2(float *vec, int dim)
 {
-    if (!vec || dim <= 0)
+    if (!vec || dim <= 0) {
         return;
+    }
     double sum = 0.0;
     for (int i = 0; i < dim; i++) {
         sum += (double)vec[i] * (double)vec[i];
@@ -43,17 +44,21 @@ chunk_list_t chunk_text(const char *text, int chunk_size_words, int overlap_word
     list.chunks = NULL;
     list.count = 0;
 
-    if (!text || chunk_size_words <= 0)
+    if (!text || chunk_size_words <= 0) {
         return list;
-    if (overlap_words < 0)
+    }
+    if (overlap_words < 0) {
         overlap_words = 0;
-    if (overlap_words >= chunk_size_words)
+    }
+    if (overlap_words >= chunk_size_words) {
         overlap_words = chunk_size_words - 1;
+    }
 
     /* First pass: count words and record offsets */
     size_t len = strlen(text);
-    if (len == 0)
+    if (len == 0) {
         return list;
+    }
 
     int max_words = 16384;
     const char **word_starts = malloc(sizeof(char *) * (size_t)max_words);
@@ -67,22 +72,26 @@ chunk_list_t chunk_text(const char *text, int chunk_size_words, int overlap_word
     int word_count = 0;
     size_t idx = 0;
     while (idx < len) {
-        while (idx < len && isspace((unsigned char)text[idx]))
+        while (idx < len && isspace((unsigned char)text[idx])) {
             idx++;
-        if (idx >= len)
+        }
+        if (idx >= len) {
             break;
+        }
 
         size_t start = idx;
-        while (idx < len && !isspace((unsigned char)text[idx]))
+        while (idx < len && !isspace((unsigned char)text[idx])) {
             idx++;
+        }
         size_t wlen = idx - start;
 
         if (word_count >= max_words) {
             max_words *= 2;
             const char **wstarts_new = realloc(word_starts, sizeof(char *) * (size_t)max_words);
             size_t *wlens_new = realloc(word_lens, sizeof(size_t) * (size_t)max_words);
-            if (!wstarts_new || !wlens_new)
+            if (!wstarts_new || !wlens_new) {
                 break;
+            }
             word_starts = wstarts_new;
             word_lens = wlens_new;
         }
@@ -100,8 +109,9 @@ chunk_list_t chunk_text(const char *text, int chunk_size_words, int overlap_word
 
     /* Compute chunks */
     int step = chunk_size_words - overlap_words;
-    if (step <= 0)
+    if (step <= 0) {
         step = 1;
+    }
 
     int chunk_cap = (word_count / step) + 2;
     list.chunks = malloc(sizeof(char *) * (size_t)chunk_cap);
@@ -124,21 +134,24 @@ chunk_list_t chunk_text(const char *text, int chunk_size_words, int overlap_word
         }
 
         char *chunk_str = malloc(buf_sz + 1);
-        if (!chunk_str)
+        if (!chunk_str) {
             break;
+        }
 
         size_t pos = 0;
         for (int i = 0; i < count_in_chunk; i++) {
-            if (i > 0)
+            if (i > 0) {
                 chunk_str[pos++] = ' ';
+            }
             memcpy(chunk_str + pos, word_starts[w + i], word_lens[w + i]);
             pos += word_lens[w + i];
         }
         chunk_str[pos] = '\0';
 
         list.chunks[list.count++] = chunk_str;
-        if (w + count_in_chunk >= word_count)
+        if (w + count_in_chunk >= word_count) {
             break;
+        }
     }
 
     free(word_starts);
@@ -148,8 +161,9 @@ chunk_list_t chunk_text(const char *text, int chunk_size_words, int overlap_word
 
 void chunk_list_free(chunk_list_t *list)
 {
-    if (!list || !list->chunks)
+    if (!list || !list->chunks) {
         return;
+    }
     for (int i = 0; i < list->count; i++) {
         free(list->chunks[i]);
     }
@@ -161,7 +175,7 @@ void chunk_list_free(chunk_list_t *list)
 static int get_optimal_thread_count(void)
 {
     long n = 4;
-#if defined(_WIN32)
+#ifdef _WIN32
     SYSTEM_INFO sysinfo;
     GetSystemInfo(&sysinfo);
     n = (long)sysinfo.dwNumberOfProcessors;
@@ -184,8 +198,9 @@ static int get_optimal_thread_count(void)
 
 embedder_context_t *embedder_init(const char *model_path, int dimension)
 {
-    if (!model_path)
+    if (!model_path) {
         return NULL;
+    }
 
     llama_backend_init();
 
@@ -234,8 +249,9 @@ embedder_context_t *embedder_init(const char *model_path, int dimension)
 
 void embedder_free(embedder_context_t *ctx)
 {
-    if (!ctx)
+    if (!ctx) {
         return;
+    }
     if (ctx->ctx) {
         llama_free(ctx->ctx);
     }
@@ -279,8 +295,8 @@ void utf8_sanitize(char *str)
             } else {
                 *s++ = ' ';
             }
-        } else if (*s >= 0xE1 && *s <= 0xEC) {
-            /* 3-byte sequence: E1..EC followed by two 80..BF */
+        } else if ((*s >= 0xE1 && *s <= 0xEC) || (*s >= 0xEE && *s <= 0xEF)) {
+            /* 3-byte sequence: E1..EC or EE..EF followed by two 80..BF */
             if (((s[1] & 0xC0) == 0x80) && ((s[2] & 0xC0) == 0x80)) {
                 s += 3;
             } else {
@@ -290,13 +306,6 @@ void utf8_sanitize(char *str)
             /* 3-byte sequence: ED followed by 80..9F, 80..BF (excludes UTF-16 surrogates
              * 0xD800..0xDFFF) */
             if ((s[1] >= 0x80 && s[1] <= 0x9F) && ((s[2] & 0xC0) == 0x80)) {
-                s += 3;
-            } else {
-                *s++ = ' ';
-            }
-        } else if (*s >= 0xEE && *s <= 0xEF) {
-            /* 3-byte sequence: EE..EF followed by two 80..BF */
-            if (((s[1] & 0xC0) == 0x80) && ((s[2] & 0xC0) == 0x80)) {
                 s += 3;
             } else {
                 *s++ = ' ';

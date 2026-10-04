@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#if defined(_WIN32)
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <direct.h>
 #include <io.h>
@@ -54,19 +54,6 @@ typedef enum {
     KEY_CHAR
 } repl_key_t;
 
-typedef struct {
-    char *insert_text;
-    char *display_text;
-    bool is_dir;
-} candidate_item_t;
-
-typedef struct {
-    candidate_item_t *items;
-    size_t count;
-    size_t cap;
-    size_t replace_from;
-} candidate_list_t;
-
 struct repl_context {
     char *history_path;
     char **history;
@@ -84,13 +71,13 @@ struct repl_context {
 
     /* Terminal state */
     bool is_raw;
-#if !defined(_WIN32)
+#ifndef _WIN32
     struct termios orig_termios;
 #endif
     int tty_fd;
 };
 
-#if defined(_WIN32)
+#ifdef _WIN32
 static void disable_raw_mode(repl_context_t *repl)
 {
     (void)repl;
@@ -170,7 +157,21 @@ static void disable_raw_mode(repl_context_t *repl)
 }
 #endif
 
-#if !defined(_WIN32)
+#ifndef _WIN32
+/* Completion candidates: the menu exists only in the POSIX line editor. */
+typedef struct {
+    char *insert_text;
+    char *display_text;
+    bool is_dir;
+} candidate_item_t;
+
+typedef struct {
+    candidate_item_t *items;
+    size_t count;
+    size_t cap;
+    size_t replace_from;
+} candidate_list_t;
+
 static repl_key_t read_key(int fd, char *out_char)
 {
     unsigned char c = 0;
@@ -179,22 +180,30 @@ static repl_key_t read_key(int fd, char *out_char)
         return KEY_NONE;
     }
 
-    if (c == '\r' || c == '\n')
+    if (c == '\r' || c == '\n') {
         return KEY_ENTER;
-    if (c == '\t')
+    }
+    if (c == '\t') {
         return KEY_TAB;
-    if (c == 0x7f || c == 0x08)
+    }
+    if (c == 0x7f || c == 0x08) {
         return KEY_BACKSPACE;
-    if (c == 0x03)
+    }
+    if (c == 0x03) {
         return KEY_CTRL_C;
-    if (c == 0x04)
+    }
+    if (c == 0x04) {
         return KEY_CTRL_D;
-    if (c == 0x01)
+    }
+    if (c == 0x01) {
         return KEY_HOME; /* Ctrl-A */
-    if (c == 0x05)
+    }
+    if (c == 0x05) {
         return KEY_END; /* Ctrl-E */
-    if (c == 0x0c)
+    }
+    if (c == 0x0c) {
         return KEY_CTRL_L; /* Ctrl-L */
+    }
 
     if (c == 0x1b) {
         /* Check if further escape sequence bytes follow */
@@ -208,52 +217,69 @@ static repl_key_t read_key(int fd, char *out_char)
         }
 
         unsigned char seq[8] = {0};
-        if (read(fd, &seq[0], 1) <= 0)
+        if (read(fd, &seq[0], 1) <= 0) {
             return KEY_ESC;
+        }
 
         if (seq[0] == '[') {
-            if (poll(&pfd, 1, 50) <= 0)
+            if (poll(&pfd, 1, 50) <= 0) {
                 return KEY_ESC;
-            if (read(fd, &seq[1], 1) <= 0)
+            }
+            if (read(fd, &seq[1], 1) <= 0) {
                 return KEY_ESC;
+            }
 
-            if (seq[1] == 'A')
+            if (seq[1] == 'A') {
                 return KEY_ARROW_UP;
-            if (seq[1] == 'B')
+            }
+            if (seq[1] == 'B') {
                 return KEY_ARROW_DOWN;
-            if (seq[1] == 'C')
+            }
+            if (seq[1] == 'C') {
                 return KEY_ARROW_RIGHT;
-            if (seq[1] == 'D')
+            }
+            if (seq[1] == 'D') {
                 return KEY_ARROW_LEFT;
-            if (seq[1] == 'H')
+            }
+            if (seq[1] == 'H') {
                 return KEY_HOME;
-            if (seq[1] == 'F')
+            }
+            if (seq[1] == 'F') {
                 return KEY_END;
-            if (seq[1] == 'Z')
+            }
+            if (seq[1] == 'Z') {
                 return KEY_SHIFT_TAB;
+            }
 
             if (seq[1] >= '0' && seq[1] <= '9') {
                 if (poll(&pfd, 1, 50) > 0) {
                     unsigned char seq2 = 0;
                     if (read(fd, &seq2, 1) > 0 && seq2 == '~') {
-                        if (seq[1] == '1' || seq[1] == '7')
+                        if (seq[1] == '1' || seq[1] == '7') {
                             return KEY_HOME;
-                        if (seq[1] == '3')
+                        }
+                        if (seq[1] == '3') {
                             return KEY_DELETE;
-                        if (seq[1] == '4' || seq[1] == '8')
+                        }
+                        if (seq[1] == '4' || seq[1] == '8') {
                             return KEY_END;
+                        }
                     }
                 }
             }
         } else if (seq[0] == 'O') {
-            if (poll(&pfd, 1, 50) <= 0)
+            if (poll(&pfd, 1, 50) <= 0) {
                 return KEY_ESC;
-            if (read(fd, &seq[1], 1) <= 0)
+            }
+            if (read(fd, &seq[1], 1) <= 0) {
                 return KEY_ESC;
-            if (seq[1] == 'H')
+            }
+            if (seq[1] == 'H') {
                 return KEY_HOME;
-            if (seq[1] == 'F')
+            }
+            if (seq[1] == 'F') {
                 return KEY_END;
+            }
         }
         return KEY_ESC;
     }
@@ -526,20 +552,10 @@ static size_t render_completion_menu(const candidate_list_t *list, size_t select
     }
 
     int term_w = 80;
-#if defined(_WIN32)
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
-        int w = csbi.srWindow.Right - csbi.srWindow.Left + 1;
-        if (w > 20) {
-            term_w = w;
-        }
-    }
-#else
     struct winsize ws;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 20) {
         term_w = ws.ws_col;
     }
-#endif
 
     size_t max_len = 0;
     for (size_t i = 0; i < list->count; i++) {
@@ -578,7 +594,7 @@ static size_t render_completion_menu(const candidate_list_t *list, size_t select
         printf("\r\n\x1b[K");
         drawn_rows++;
         for (size_t c = 0; c < cols; c++) {
-            size_t idx = r * cols + c;
+            size_t idx = (r * cols) + c;
             if (idx >= list->count) {
                 break;
             }
@@ -635,10 +651,10 @@ static size_t menu_move_up(size_t cur, size_t count, size_t cols)
     }
     size_t total_rows = (count + cols - 1) / cols;
     size_t last_row = total_rows - 1;
-    size_t target = last_row * cols + col;
+    size_t target = (last_row * cols) + col;
     if (target >= count) {
         if (last_row > 0) {
-            target = (last_row - 1) * cols + col;
+            target = ((last_row - 1) * cols) + col;
         } else {
             target = cur;
         }
@@ -649,8 +665,9 @@ static size_t menu_move_up(size_t cur, size_t count, size_t cols)
 
 static void repl_history_push(repl_context_t *repl, const char *line)
 {
-    if (!repl || !line || line[0] == '\0')
+    if (!repl || !line || line[0] == '\0') {
         return;
+    }
 
     /* Don't add duplicate of previous entry */
     if (repl->history_count > 0 && strcmp(repl->history[repl->history_count - 1], line) == 0) {
@@ -660,8 +677,9 @@ static void repl_history_push(repl_context_t *repl, const char *line)
     if (repl->history_count >= repl->history_cap) {
         size_t new_cap = repl->history_cap == 0 ? REPL_HISTORY_CAP_INIT : repl->history_cap * 2;
         char **grown = (char **)realloc(repl->history, new_cap * sizeof(char *));
-        if (!grown)
+        if (!grown) {
             return;
+        }
         repl->history = grown;
         repl->history_cap = new_cap;
     }
@@ -675,8 +693,9 @@ static void repl_history_push(repl_context_t *repl, const char *line)
 repl_context_t *repl_init(const char *history_path)
 {
     repl_context_t *repl = (repl_context_t *)calloc(1, sizeof(repl_context_t));
-    if (!repl)
+    if (!repl) {
         return NULL;
+    }
 
     repl->tty_fd = STDIN_FILENO;
     repl->line_cap = REPL_LINE_CAP_INIT;
@@ -729,8 +748,9 @@ repl_context_t *repl_init(const char *history_path)
 
 void repl_history_add(repl_context_t *repl, const char *line)
 {
-    if (!repl || !line || line[0] == '\0')
+    if (!repl || !line || line[0] == '\0') {
         return;
+    }
 
     /* Don't add duplicate of previous entry */
     if (repl->history_count > 0 && strcmp(repl->history[repl->history_count - 1], line) == 0) {
@@ -745,7 +765,7 @@ void repl_history_add(repl_context_t *repl, const char *line)
         strncpy(dir_buf, repl->history_path, sizeof(dir_buf) - 1);
         dir_buf[sizeof(dir_buf) - 1] = '\0';
         char *slash = strrchr(dir_buf, '/');
-#if defined(_WIN32)
+#ifdef _WIN32
         if (!slash)
             slash = strrchr(dir_buf, '\\');
 #endif
@@ -764,10 +784,11 @@ void repl_history_add(repl_context_t *repl, const char *line)
 
 char *repl_readline(repl_context_t *repl, const char *prompt)
 {
-    if (!repl)
+    if (!repl) {
         return NULL;
+    }
 
-#if defined(_WIN32)
+#ifdef _WIN32
     printf("%s", prompt);
     fflush(stdout);
     char buf[4096];
@@ -804,8 +825,9 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
         }
         if (repl->line_cap <= l) {
             char *grown = (char *)realloc(repl->line_buf, l + 64);
-            if (!grown)
+            if (!grown) {
                 return NULL;
+            }
             repl->line_buf = grown;
             repl->line_cap = l + 64;
         }
@@ -822,9 +844,7 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
     repl->line_len = 0;
     repl->cursor = 0;
     repl->line_buf[0] = '\0';
-    if (repl->scratch_buf) {
-        repl->scratch_buf[0] = '\0';
-    }
+    repl->scratch_buf[0] = '\0';
 
     redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
 
@@ -849,7 +869,8 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
                     redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
                 }
                 continue;
-            } else if (key == KEY_SHIFT_TAB || key == KEY_ARROW_LEFT) {
+            }
+            if (key == KEY_SHIFT_TAB || key == KEY_ARROW_LEFT) {
                 if (candidates.count > 0) {
                     menu_sel = (menu_sel == 0) ? candidates.count - 1 : menu_sel - 1;
                     clear_menu_display(menu_rows);
@@ -857,7 +878,8 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
                     redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
                 }
                 continue;
-            } else if (key == KEY_ARROW_DOWN) {
+            }
+            if (key == KEY_ARROW_DOWN) {
                 if (candidates.count > 0) {
                     menu_sel = menu_move_down(menu_sel, candidates.count, menu_cols);
                     clear_menu_display(menu_rows);
@@ -865,7 +887,8 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
                     redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
                 }
                 continue;
-            } else if (key == KEY_ARROW_UP) {
+            }
+            if (key == KEY_ARROW_UP) {
                 if (candidates.count > 0) {
                     menu_sel = menu_move_up(menu_sel, candidates.count, menu_cols);
                     clear_menu_display(menu_rows);
@@ -873,7 +896,8 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
                     redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
                 }
                 continue;
-            } else if (key == KEY_ENTER) {
+            }
+            if (key == KEY_ENTER) {
                 /* Accept selected completion */
                 if (candidates.count > 0 && menu_sel < candidates.count) {
                     const char *choice = candidates.items[menu_sel].insert_text;
@@ -889,10 +913,13 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
                             repl->line_cap = ncap;
                         }
                     }
-                    memcpy(repl->line_buf + from, choice, clen);
-                    repl->line_len = from + clen;
-                    repl->line_buf[repl->line_len] = '\0';
-                    repl->cursor = repl->line_len;
+                    /* realloc may have failed: insert only when it fits */
+                    if (needed < repl->line_cap) {
+                        memcpy(repl->line_buf + from, choice, clen);
+                        repl->line_len = from + clen;
+                        repl->line_buf[repl->line_len] = '\0';
+                        repl->cursor = repl->line_len;
+                    }
                 }
                 clear_menu_display(menu_rows);
                 menu_rows = 0;
@@ -900,7 +927,8 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
                 candidate_list_free(&candidates);
                 redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
                 continue;
-            } else if (key == KEY_ESC || key == KEY_CTRL_C) {
+            }
+            if (key == KEY_ESC || key == KEY_CTRL_C) {
                 /* Cancel completion */
                 clear_menu_display(menu_rows);
                 menu_rows = 0;
@@ -908,14 +936,13 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
                 candidate_list_free(&candidates);
                 redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
                 continue;
-            } else {
-                /* Dismiss menu and process key normally */
-                clear_menu_display(menu_rows);
-                menu_rows = 0;
-                menu_active = false;
-                candidate_list_free(&candidates);
-                redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
             }
+            /* Dismiss menu and process key normally */
+            clear_menu_display(menu_rows);
+            menu_rows = 0;
+            menu_active = false;
+            candidate_list_free(&candidates);
+            redraw_prompt_and_line(prompt, repl->line_buf, repl->line_len, repl->cursor);
         }
 
         if (key == KEY_ENTER) {
@@ -1005,8 +1032,9 @@ char *repl_readline(repl_context_t *repl, const char *prompt)
 
         /* History navigation */
         if (key == KEY_ARROW_UP) {
-            if (repl->history_count == 0)
+            if (repl->history_count == 0) {
                 continue;
+            }
 
             if (history_index == -1) {
                 /* Save current input to scratch buffer */

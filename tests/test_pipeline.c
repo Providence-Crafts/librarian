@@ -36,24 +36,31 @@ const char *test_pipeline_concurrent_ingest(void)
     char f3[] = "/tmp/lib_pipe_test_3.txt";
 
     FILE *fp1 = fopen(f1, "w");
+    mu_assert("fopen fp1 failed", fp1 != NULL);
     fprintf(fp1, "Librarian is a self-contained local RAG system implemented in pure C99.\n");
     fclose(fp1);
 
     FILE *fp2 = fopen(f2, "w");
+    mu_assert("fopen fp2 failed", fp2 != NULL);
     fprintf(fp2, "Vulkan acceleration allows sub-second embedding and high throughput.\n");
     fclose(fp2);
 
     FILE *fp3 = fopen(f3, "w");
+    mu_assert("fopen fp3 failed", fp3 != NULL);
     fprintf(fp3, "Multi-threaded pipelined ingestion extracts documents concurrently.\n");
     fclose(fp3);
 
-    const char *f4 = "/tmp/test_pipeline_empty.txt";
+    char f4[] = "/tmp/test_pipeline_empty.txt";
     FILE *fp4 = fopen(f4, "w");
+    mu_assert("fopen fp4 failed", fp4 != NULL);
     /* Empty file: 0 words -> extract_failed */
     fclose(fp4);
 
-    char *paths[4] = {f1, f2, f3, (char *)f4};
-    int docs = 0, chunks = 0, skipped = 0, failed = 0;
+    char *paths[4] = {f1, f2, f3, f4};
+    int docs = 0;
+    int chunks = 0;
+    int skipped = 0;
+    int failed = 0;
 
     int rc =
         pipeline_ingest_files(db, emb, paths, 4, 1024, 250, 40, &docs, &chunks, &skipped, &failed);

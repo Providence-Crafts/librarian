@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if defined(_WIN32)
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <io.h>
 #include <windows.h>
@@ -173,7 +173,7 @@ void ui_clear_status(void)
 static int get_terminal_width(void)
 {
     int term_w = 80;
-#if defined(_WIN32)
+#ifdef _WIN32
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
         int w = csbi.srWindow.Right - csbi.srWindow.Left + 1;
@@ -295,10 +295,12 @@ void ui_ingest_progress_chunk(size_t current, size_t total, const char *file_pat
 void ui_confidence_badge(float confidence, bool is_refusal)
 {
     int pct = (int)(confidence * 100.0f);
-    if (pct < 0)
+    if (pct < 0) {
         pct = 0;
-    if (pct > 100)
+    }
+    if (pct > 100) {
         pct = 100;
+    }
 
     if (is_refusal) {
         printf(COLOR_PEACH "✦ [Refusal Confidence: %d%%]" COLOR_RESET "\n", pct);
@@ -549,7 +551,8 @@ void ui_list_documents(const doc_info_t *docs, int count, const char *search_pat
         if (*t == 'q' || *t == 'Q') {
             printf("\n");
             break;
-        } else if (*t == 'p' || *t == 'P') {
+        }
+        if (*t == 'p' || *t == 'P') {
             if (current_page > 0) {
                 current_page--;
             }
@@ -561,7 +564,7 @@ void ui_list_documents(const doc_info_t *docs, int count, const char *search_pat
                 break;
             }
         } else if (isdigit((unsigned char)*t)) {
-            int pnum = atoi(t);
+            int pnum = (int)strtol(t, NULL, 10);
             if (pnum >= 1 && pnum <= total_pages) {
                 current_page = pnum - 1;
             }
@@ -670,7 +673,8 @@ void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *ch
         if (*t == 'q' || *t == 'Q') {
             printf("\n");
             break;
-        } else if (*t == 'p' || *t == 'P') {
+        }
+        if (*t == 'p' || *t == 'P') {
             if (current_page > 0) {
                 current_page--;
             }
@@ -682,7 +686,7 @@ void ui_list_chunks(int64_t doc_id, const char *doc_path, const chunk_info_t *ch
                 break;
             }
         } else if (isdigit((unsigned char)*t)) {
-            int pnum = atoi(t);
+            int pnum = (int)strtol(t, NULL, 10);
             if (pnum >= 1 && pnum <= total_pages) {
                 current_page = pnum - 1;
             }

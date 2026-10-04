@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#if defined(_WIN32)
+#ifdef _WIN32
 #define popen _popen
 #define pclose _pclose
 #endif
@@ -90,7 +90,7 @@ char *doc_shell_escape(const char *str)
         return NULL;
     }
     size_t len = strlen(str);
-    char *escaped = malloc(len * 4 + 3);
+    char *escaped = malloc((len * 4) + 3);
     if (!escaped) {
         return NULL;
     }
@@ -118,7 +118,7 @@ static char *read_pipe_output(FILE *fp)
         return NULL;
     }
 
-    size_t cap = 64 * 1024;
+    size_t cap = (size_t)64 * 1024;
     size_t len = 0;
     char *buf = malloc(cap);
     if (!buf) {
@@ -176,7 +176,7 @@ static char *read_entire_plain_file(const char *path)
     }
 
     size_t read_bytes = fread(buf, 1, (size_t)sz, fp);
-    buf[read_bytes] = '\0';
+    buf[read_bytes] = '\0'; /* NOLINT(clang-analyzer-security.ArrayBound): fread returns <= sz */
     fclose(fp);
     return buf;
 }
@@ -576,7 +576,7 @@ static char *doc_extract_pdf_stream_fallback(const char *path)
         char *flate_buf = NULL;
 
         if (is_flate && s_len > 2) {
-            mz_ulong uncomp_len = (mz_ulong)(s_len * 10 + 4096);
+            mz_ulong uncomp_len = (mz_ulong)((s_len * 10) + 4096);
             flate_buf = malloc(uncomp_len);
             if (flate_buf &&
                 mz_uncompress((unsigned char *)flate_buf, &uncomp_len,
@@ -687,7 +687,7 @@ char *doc_extract_text(const char *file_path)
             snprintf(cmd, sizeof(cmd), "pdftotext -q -nopgbrk %s - 2>/dev/null", escaped);
             free(escaped);
 
-            FILE *p = popen(cmd, "r");
+            FILE *p = popen(cmd, "r"); /* NOLINT(cert-env33-c): path is shell-escaped */
             if (p) {
                 raw_text = read_pipe_output(p);
                 int rc = pclose(p);
@@ -721,7 +721,7 @@ char *doc_extract_text(const char *file_path)
             snprintf(cmd, sizeof(cmd), "antiword -t %s 2>/dev/null", escaped);
             free(escaped);
 
-            FILE *p = popen(cmd, "r");
+            FILE *p = popen(cmd, "r"); /* NOLINT(cert-env33-c): path is shell-escaped */
             if (p) {
                 raw_text = read_pipe_output(p);
                 pclose(p);
@@ -785,6 +785,7 @@ void doc_clean_path(const char *in, char *out, size_t out_sz)
     }
 
     /* 3. Strip matching outer quotes: "path" or 'path' */
+    /* cppcheck-suppress knownConditionTrueFalse ; a false positive: length can be >= 2 */
     if ((size_t)(end - start) >= 2 &&
         ((*start == '"' && *(end - 1) == '"') || (*start == '\'' && *(end - 1) == '\''))) {
         start++;

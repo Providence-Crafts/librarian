@@ -13,7 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if defined(_WIN32)
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
@@ -314,7 +314,7 @@ int pipeline_ingest_files(db_context_t *db, embedder_context_t *emb, char **file
 
     /* Step 2: Determine worker thread count */
     long nprocs = 4;
-#if defined(_WIN32)
+#ifdef _WIN32
     SYSTEM_INFO sysinfo;
     GetSystemInfo(&sysinfo);
     nprocs = (long)sysinfo.dwNumberOfProcessors;
@@ -324,7 +324,8 @@ int pipeline_ingest_files(db_context_t *db, embedder_context_t *emb, char **file
     if (nprocs < 1) {
         nprocs = 4;
     }
-    int num_workers = (int)(nprocs > 4 ? nprocs - 2 : (nprocs > 1 ? nprocs : 1));
+    /* Leave two cores for the main thread and the system once there are more than four. */
+    int num_workers = (int)(nprocs > 4 ? nprocs - 2 : nprocs);
     if (num_workers > 8) {
         num_workers = 8;
     }
@@ -412,7 +413,7 @@ int pipeline_ingest_files(db_context_t *db, embedder_context_t *emb, char **file
                                                       (size_t)embed_dim);
                     if (vecs && vec_pool) {
                         for (int c = 0; c < doc.chunks.count; c++) {
-                            vecs[c] = vec_pool + (size_t)c * (size_t)embed_dim;
+                            vecs[c] = vec_pool + ((size_t)c * (size_t)embed_dim);
                         }
 
                         int slice_sz = 16;

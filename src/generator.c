@@ -18,8 +18,9 @@ struct generator_context {
 
 generator_context_t *generator_init(const char *model_path, int context_length)
 {
-    if (!model_path)
+    if (!model_path) {
         return NULL;
+    }
 
     llama_backend_init();
 
@@ -69,8 +70,9 @@ generator_context_t *generator_init(const char *model_path, int context_length)
 
 void generator_free(generator_context_t *ctx)
 {
-    if (!ctx)
+    if (!ctx) {
         return;
+    }
     if (ctx->sampler) {
         llama_sampler_free(ctx->sampler);
     }
@@ -85,8 +87,9 @@ void generator_free(generator_context_t *ctx)
 
 void generation_result_free(generation_result_t *res)
 {
-    if (!res)
+    if (!res) {
         return;
+    }
     if (res->text) {
         free(res->text);
         res->text = NULL;
@@ -153,8 +156,9 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
         if (written + needed >= prompt_cap) {
             prompt_cap = (written + needed) * 2;
             char *grown = realloc(prompt, prompt_cap);
-            if (!grown)
+            if (!grown) {
                 break;
+            }
             prompt = grown;
         }
         written += (size_t)snprintf(prompt + written, prompt_cap - written, "%s%s\n\n",
@@ -170,8 +174,9 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
     if (written + strlen(footer) + 1 >= prompt_cap) {
         prompt_cap = written + strlen(footer) + 256;
         char *grown = realloc(prompt, prompt_cap);
-        if (grown)
+        if (grown) {
             prompt = grown;
+        }
     }
     snprintf(prompt + written, prompt_cap - written, "%s", footer);
 
@@ -219,8 +224,9 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
     int n_batch_sz = 256;
     for (int i = 0; i < n_tokens; i += n_batch_sz) {
         int cur_batch = n_tokens - i;
-        if (cur_batch > n_batch_sz)
+        if (cur_batch > n_batch_sz) {
             cur_batch = n_batch_sz;
+        }
 
         struct llama_batch batch = llama_batch_init(cur_batch, 0, 1);
         for (int b = 0; b < cur_batch; b++) {
@@ -228,7 +234,7 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
             batch.pos[b] = pos++;
             batch.n_seq_id[b] = 1;
             batch.seq_id[b][0] = 0;
-            batch.logits[b] = (i + b == n_tokens - 1); /* logits only for the last token */
+            batch.logits[b] = (int8_t)(i + b == n_tokens - 1); /* logits only for the last token */
         }
         batch.n_tokens = cur_batch;
 
@@ -274,8 +280,9 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
         if (logits && n_vocab > 0 && token >= 0 && token < n_vocab) {
             float max_l = -1e9f;
             for (int v = 0; v < n_vocab; v++) {
-                if (logits[v] > max_l)
+                if (logits[v] > max_l) {
                     max_l = logits[v];
+                }
             }
             double sum_exp = 0.0;
             for (int v = 0; v < n_vocab; v++) {
@@ -293,8 +300,9 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
             if (out_len + (size_t)piece_len + 1 >= out_cap) {
                 out_cap = (out_len + (size_t)piece_len + 1) * 2;
                 char *grown = realloc(out_text, out_cap);
-                if (!grown)
+                if (!grown) {
                     break;
+                }
                 out_text = grown;
             }
             memcpy(out_text + out_len, piece, (size_t)piece_len);
@@ -302,13 +310,13 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
             out_text[out_len] = '\0';
 
             /* Check for stop sequences */
+            static const char *const stops[] = {
+                "<|im_end|>", "<|im_start|>", "\nQuestion:", "\nUser:", "\nHuman:", "\n---"};
             char *stop_pos = NULL;
-            if ((stop_pos = strstr(out_text, "<|im_end|>")) != NULL ||
-                (stop_pos = strstr(out_text, "<|im_start|>")) != NULL ||
-                (stop_pos = strstr(out_text, "\nQuestion:")) != NULL ||
-                (stop_pos = strstr(out_text, "\nUser:")) != NULL ||
-                (stop_pos = strstr(out_text, "\nHuman:")) != NULL ||
-                (stop_pos = strstr(out_text, "\n---")) != NULL) {
+            for (size_t k = 0; k < sizeof(stops) / sizeof(stops[0]) && !stop_pos; k++) {
+                stop_pos = strstr(out_text, stops[k]);
+            }
+            if (stop_pos) {
                 *stop_pos = '\0';
                 break;
             }
@@ -325,8 +333,9 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
 
         int rc = llama_decode(ctx->ctx, next_batch);
         llama_batch_free(next_batch);
-        if (rc != 0)
+        if (rc != 0) {
             break;
+        }
     }
 
     /* Strip thinking block if present */
@@ -350,10 +359,12 @@ generation_result_t generator_generate(generator_context_t *ctx, const char *que
     if (n_gen_tokens > 0) {
         mean_conf = (float)exp(sum_logprobs / (double)n_gen_tokens);
     }
-    if (mean_conf < 0.0f)
+    if (mean_conf < 0.0f) {
         mean_conf = 0.0f;
-    if (mean_conf > 1.0f)
+    }
+    if (mean_conf > 1.0f) {
         mean_conf = 1.0f;
+    }
 
     res.confidence = mean_conf;
 

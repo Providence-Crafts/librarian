@@ -159,11 +159,10 @@ int config_load(const char *path, librarian_config_t *cfg)
             actual_path = "librarian.toml";
         } else {
             config_get_default_paths(sys_cfg, sizeof(sys_cfg), sys_data, sizeof(sys_data));
-            if (stat(sys_cfg, &st) == 0) {
-                actual_path = sys_cfg;
-            } else {
-                actual_path = "librarian.toml";
+            if (stat(sys_cfg, &st) != 0) {
+                return 0; /* no config file anywhere: the defaults stand */
             }
+            actual_path = sys_cfg;
         }
     }
 

@@ -118,7 +118,9 @@ static void collect_files_recursive(const char *path, file_list_t *list)
             }
 
             char subpath[2048];
-            snprintf(subpath, sizeof(subpath), "%s/%s", path, entry->d_name);
+            size_t plen = strlen(path);
+            const char *sep = (plen > 0 && path[plen - 1] == '/') ? "" : "/";
+            snprintf(subpath, sizeof(subpath), "%s%s%s", path, sep, entry->d_name);
             collect_files_recursive(subpath, list);
         }
         closedir(dir);
@@ -480,6 +482,12 @@ static int run_query_mode(librarian_config_t *cfg, const char *question)
         ui_error("Failed to open database %s", cfg->db_path);
         return 1;
     }
+    /* A fresh database has no tables until the schema is created. */
+    if (db_init_schema(db, cfg->embed_dimension) != 0) {
+        ui_error("Failed to initialise database schema in %s", cfg->db_path);
+        db_close(db);
+        return 1;
+    }
 
     embedder_context_t *emb = embedder_init(cfg->embed_model_path, cfg->embed_dimension);
     if (!emb) {
@@ -711,12 +719,12 @@ static int run_chat_mode(const librarian_config_t *initial_cfg)
 
         if (strcmp(cmd, "/reload") == 0) {
             librarian_config_t new_cfg;
-            if (config_load(CONFIG_DEFAULT_PATH, &new_cfg) == 0) {
+            if (config_load(NULL, &new_cfg) == 0) {
                 cfg = new_cfg;
-                ui_success("Reloaded configuration from %s", CONFIG_DEFAULT_PATH);
+                ui_success("Reloaded configuration");
                 config_print(&cfg);
             } else {
-                ui_error("Failed to reload configuration from %s", CONFIG_DEFAULT_PATH);
+                ui_error("Failed to reload configuration");
             }
             continue;
         }
@@ -965,6 +973,12 @@ static int run_docs_mode(const librarian_config_t *cfg, const char *search_patte
         ui_error("Failed to open database %s", cfg->db_path);
         return 1;
     }
+    /* A fresh database has no tables until the schema is created. */
+    if (db_init_schema(db, cfg->embed_dimension) != 0) {
+        ui_error("Failed to initialise database schema in %s", cfg->db_path);
+        db_close(db);
+        return 1;
+    }
 
     doc_info_t *docs = NULL;
     int count = 0;
@@ -991,6 +1005,12 @@ static int run_chunks_mode(const librarian_config_t *cfg, const char *target, co
     db_context_t *db = db_open(cfg->db_path);
     if (!db) {
         ui_error("Failed to open database %s", cfg->db_path);
+        return 1;
+    }
+    /* A fresh database has no tables until the schema is created. */
+    if (db_init_schema(db, cfg->embed_dimension) != 0) {
+        ui_error("Failed to initialise database schema in %s", cfg->db_path);
+        db_close(db);
         return 1;
     }
 
@@ -1121,8 +1141,8 @@ int main(int argc, char **argv)
     }
 
     librarian_config_t cfg;
-    if (config_load(CONFIG_DEFAULT_PATH, &cfg) != 0) {
-        ui_warn("Could not load %s; using default configuration", CONFIG_DEFAULT_PATH);
+    if (config_load(NULL, &cfg) != 0) {
+        ui_warn("Could not load the configuration file; using defaults");
     }
 
     /* Initialize logger to redirect llama.cpp/ggml output to log file */

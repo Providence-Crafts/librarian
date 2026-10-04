@@ -5,6 +5,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENDOR_DIR="${SCRIPT_DIR}/vendor"
 mkdir -p "${VENDOR_DIR}"
 
+# Pinned to the commits librarian is tested against; bump deliberately.
+TOMLC99_REV="29076dfd095bbbbd50a3c1b2760d29f4b83e74ac"
+LLAMA_REV="f872b591121761ac7b2af18283bd99bdc092a63a" # b11301-9
+
+# Shallow-clone one commit of a repository into a directory.
+fetch_rev() {
+    git init -q "$3"
+    git -C "$3" fetch -q --depth 1 "$1" "$2"
+    git -C "$3" -c advice.detachedHead=false checkout -q FETCH_HEAD
+}
+
 echo "=== Librarian Vendor Setup ==="
 
 # 1. SQLite3 amalgamation
@@ -42,7 +53,7 @@ fi
 TOMLC99_DIR="${VENDOR_DIR}/tomlc99"
 if [ ! -d "${TOMLC99_DIR}/.git" ] && [ ! -f "${TOMLC99_DIR}/toml.c" ]; then
     echo "[3/4] Cloning tomlc99..."
-    git clone --depth 1 https://github.com/cktan/tomlc99 "${TOMLC99_DIR}"
+    fetch_rev https://github.com/cktan/tomlc99 "${TOMLC99_REV}" "${TOMLC99_DIR}"
     echo "  -> tomlc99 cloned to ${TOMLC99_DIR}"
 else
     echo "[3/4] tomlc99 present."
@@ -52,7 +63,13 @@ fi
 LLAMA_DIR="${VENDOR_DIR}/llama.cpp"
 if [ ! -d "${LLAMA_DIR}" ]; then
     echo "[4/4] Cloning llama.cpp..."
-    git clone --depth 1 https://github.com/ggml-org/llama.cpp "${LLAMA_DIR}"
+    fetch_rev https://github.com/ggml-org/llama.cpp "${LLAMA_REV}" "${LLAMA_DIR}"
+fi
+
+# The Windows build compiles its own llama.cpp (make windows).
+if [ "${SKIP_LLAMA_BUILD:-0}" = 1 ]; then
+    echo "=== Vendor sources fetched; llama.cpp build skipped ==="
+    exit 0
 fi
 
 echo "[4/4] Building llama.cpp static libraries..."

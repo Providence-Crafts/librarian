@@ -1,0 +1,66 @@
+name: release
+
+# Pushing a tag vX.Y.Z builds both platforms and publishes a GitHub release with
+# librarian-X.Y.Z-linux-x86_64.tar.gz and librarian-X.Y.Z-windows-x86_64.zip.
+# The winget manifest under packaging/winget/ is then updated from the zip's
+# SHA256 (see packaging/winget/README.md). Models are not bundled: the first
+# `librarian setup` downloads them.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04 # older glibc, so the binary runs on more distributions
+    steps:
+      - uses: actions/checkout@v5
+      - run: sudo apt-get update && sudo apt-get install -y cmake
+      - run: |
+          ./setup.sh
+          make LDFLAGS="-static-libstdc++ -static-libgcc" release
+          v="${GITHUB_REF_NAME#v}"; d="librarian-$v-linux-x86_64"
+          mkdir "$d" && cp bin/librarian README.md librarian.toml "$d/"
+          if [ -f LICENSE ]; then cp LICENSE "$d/"; fi
+          tar czf "$d.tar.gz" "$d"
+      - uses: actions/upload-artifact@v4
+        with: { name: linux, path: '*.tar.gz' }
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: >-
+            make git curl unzip zip
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+      - run: |
+          SKIP_LLAMA_BUILD=1 ./setup.sh
+          make WIN_CC=gcc WIN_CXX=g++ windows
+          v="${GITHUB_REF_NAME#v}"; d="librarian-$v-windows-x86_64"
+          mkdir "$d" && cp bin/librarian.exe README.md librarian.toml "$d/"
+          if [ -f LICENSE ]; then cp LICENSE "$d/"; fi
+          zip -qr "$d.zip" "$d"
+          sha256sum "$d.zip"
+      - uses: actions/upload-artifact@v4
+        with: { name: windows, path: '*.zip' }
+
+  publish:
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { merge-multiple: true }
+      - run: sha256sum *.tar.gz *.zip > SHA256SUMS
+      - run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes *.tar.gz *.zip SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}

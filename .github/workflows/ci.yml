@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # The full gate, in the same pinned Nix shell as local development.
+  # vendor/ holds llama.cpp and tomlc99 at the revisions pinned in setup.sh.
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - uses: actions/cache@v4
+        with:
+          path: |
+            vendor/llama.cpp
+            vendor/tomlc99
+          key: vendor-linux-${{ hashFiles('setup.sh') }}
+      - run: nix develop --command bash -c './setup.sh && make gate'
+
+  # Native MinGW-w64 build on Windows: static exe with llama.cpp built by
+  # `make windows`, then a smoke run. The unit tests are POSIX-only for now.
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: >-
+            make git curl unzip
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+      - run: SKIP_LLAMA_BUILD=1 ./setup.sh
+      - run: make WIN_CC=gcc WIN_CXX=g++ windows
+      - name: Smoke test
+        run: |
+          ./bin/librarian.exe --version
+          mkdir -p smoke/data && cd smoke && NO_COLOR=1 ../bin/librarian.exe docs

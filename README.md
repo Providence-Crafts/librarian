@@ -171,9 +171,15 @@ builds `llama.cpp` without GPU back ends.
 
 ## Development
 
-`docs/pipeline_ingestion_architecture.md` describes the ingestion pipeline,
-`docs/cross_platform_distribution_and_self_contained_pipeline.md` the
-packaging plan, and `docs/family.md` the design contract shared with redstone.
+[`PROJECT.md`](PROJECT.md) holds the goals, the gate, the roadmap and the
+checks still outstanding. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+describes the design, and
+[`docs/development-workflow.md`](docs/development-workflow.md) the way work is
+planned and done. [`docs/family.md`](docs/family.md) is the design contract
+shared with redstone. `docs/pipeline_ingestion_architecture.md` and
+`docs/cross_platform_distribution_and_self_contained_pipeline.md` go into more
+depth on ingestion and packaging.
+
 `make gate` is the single definition of done; `make logo` regenerates
 `docs/logo.svg` from the banner bitmap in `src/brand_art.h`.
 

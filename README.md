@@ -4,6 +4,10 @@
 
 <h1 align="center">librarian</h1>
 
+<p align="center">
+  <a href="https://github.com/Providence-Crafts/librarian/releases/latest"><img src="https://img.shields.io/github/v/release/Providence-Crafts/librarian" alt="latest release"></a>
+</p>
+
 A local retrieval-augmented question answering engine in pure C99: point it at
 your documents, then ask questions and get answers grounded in, and cited
 from, what you indexed — with no server, no Python and no network after setup.

@@ -2,7 +2,14 @@
 # Librarian: Pure C99 Embedded RAG System Makefile
 # ==============================================================================
 
-CC ?= clang
+# `CC ?=` does not work here: make predefines CC, so ?= never fires.
+# Only override when the value is make's own default.
+# clang when installed (the Nix shell has it), then gcc, then cc, so a plain
+# Ubuntu or MSYS2 install builds without extra flags. clang needs libomp for
+# -fopenmp; without it, `make CC=gcc`.
+ifeq ($(origin CC),default)
+  CC = $(firstword $(foreach c,clang gcc,$(if $(shell command -v $(c) 2>/dev/null),$(c))) cc)
+endif
 STD = -std=c99
 
 TARGET_NAME = librarian
@@ -125,8 +132,14 @@ tsan: LDFLAGS += -fsanitize=thread
 tsan: $(BIN_DIR)/$(TARGET_NAME)
 
 # Windows MinGW Cross-Compilation Target
+# Natively under MSYS2 the toolchain is plain gcc; elsewhere it is the cross one.
+ifeq ($(OS),Windows_NT)
+WIN_CC ?= gcc
+WIN_CXX ?= g++
+else
 WIN_CC ?= x86_64-w64-mingw32-gcc
 WIN_CXX ?= x86_64-w64-mingw32-g++
+endif
 WIN_BUILD_DIR = $(BUILD_DIR)/win
 # C99 printf (%zu and friends) from the MinGW runtime rather than msvcrt's.
 WIN_DEFINES = -D__USE_MINGW_ANSI_STDIO=1

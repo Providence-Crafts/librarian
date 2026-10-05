@@ -1,7 +1,9 @@
 name: release
 
 # Pushing a tag vX.Y.Z builds both platforms and publishes a GitHub release with
-# librarian-X.Y.Z-linux-x86_64.tar.gz and librarian-X.Y.Z-windows-x86_64.zip.
+# librarian-X.Y.Z-linux-x86_64.tar.gz and librarian-X.Y.Z-windows-x86_64.zip,
+# plus the bare executables librarian-X.Y.Z-linux-x86_64 and
+# librarian-X.Y.Z-windows-x86_64.exe.
 # The winget manifest under packaging/winget/ is then updated from the zip's
 # SHA256 (see packaging/winget/README.md). Models are not bundled: the first
 # `librarian setup` downloads them.
@@ -22,11 +24,15 @@ jobs:
           ./setup.sh
           make release
           v="${GITHUB_REF_NAME#v}"; d="librarian-$v-linux-x86_64"
-          mkdir "$d" && cp bin/librarian README.md librarian.toml "$d/"
-          if [ -f LICENSE ]; then cp LICENSE "$d/"; fi
+          mkdir "$d" && cp bin/librarian README.md LICENSE librarian.toml "$d/"
           tar czf "$d.tar.gz" "$d"
+          cp bin/librarian "$d-bin" # renamed in publish; $d is the directory
       - uses: actions/upload-artifact@v4
-        with: { name: linux, path: 'librarian-*.tar.gz' }
+        with:
+          name: linux
+          path: |
+            librarian-*-linux-x86_64.tar.gz
+            librarian-*-linux-x86_64-bin
 
   windows:
     runs-on: windows-latest
@@ -45,14 +51,18 @@ jobs:
             mingw-w64-ucrt-x86_64-ninja
       - run: |
           SKIP_LLAMA_BUILD=1 ./setup.sh
-          make WIN_CC=gcc WIN_CXX=g++ windows
+          make windows
           v="${GITHUB_REF_NAME#v}"; d="librarian-$v-windows-x86_64"
-          mkdir "$d" && cp bin/librarian.exe README.md librarian.toml "$d/"
-          if [ -f LICENSE ]; then cp LICENSE "$d/"; fi
+          mkdir "$d" && cp bin/librarian.exe README.md LICENSE librarian.toml "$d/"
           zip -qr "$d.zip" "$d"
+          cp bin/librarian.exe "$d.exe"
           sha256sum "$d.zip"
       - uses: actions/upload-artifact@v4
-        with: { name: windows, path: 'librarian-*.zip' }
+        with:
+          name: windows
+          path: |
+            librarian-*-windows-x86_64.zip
+            librarian-*-windows-x86_64.exe
 
   publish:
     needs: [linux, windows]
@@ -60,7 +70,10 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with: { merge-multiple: true }
-      - run: sha256sum librarian-*.tar.gz librarian-*.zip > SHA256SUMS
-      - run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes librarian-*.tar.gz librarian-*.zip SHA256SUMS
+      - run: |
+          for f in librarian-*-bin; do mv "$f" "${f%-bin}"; done
+          sha256sum librarian-* > SHA256SUMS
+          cat SHA256SUMS
+      - run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes librarian-* SHA256SUMS
         env:
           GH_TOKEN: ${{ github.token }}

@@ -1,6 +1,6 @@
 # winget manifest
 
-`0.1.0/` is the manifest set for `winget install ProvidenceCrafts.librarian`, in the layout
+Each `X.Y.Z/` directory is the manifest set for `winget install ProvidenceCrafts.librarian`, in the layout
 [winget-pkgs](https://github.com/microsoft/winget-pkgs) expects under
 `manifests/p/ProvidenceCrafts/librarian/<version>/`.
 
@@ -8,7 +8,7 @@ The installer hash is a placeholder until the release exists. For each release:
 
 1. Push the tag `vX.Y.Z`; `.github/workflows/release.yml` publishes
    `librarian-X.Y.Z-windows-x86_64.zip` and `SHA256SUMS`.
-2. Copy `0.1.0/` to `X.Y.Z/` and replace the version, the URL and `InstallerSha256` with the line
+2. Copy the latest version directory to `X.Y.Z/` and replace the version, the URL and `InstallerSha256` with the line
    for the zip from `SHA256SUMS`.
 3. Check locally on Windows: `winget validate --manifest X.Y.Z` and
    `winget install --manifest X.Y.Z`.

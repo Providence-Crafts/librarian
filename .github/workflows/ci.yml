@@ -24,6 +24,17 @@ jobs:
           key: vendor-linux-${{ hashFiles('setup.sh') }}
       - run: nix develop --command bash -c './setup.sh && make gate'
 
+  # The documented build without Nix: distribution packages, gcc, setup.sh.
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: sudo apt-get update && sudo apt-get install -y build-essential cmake git curl unzip
+      - run: ./setup.sh
+      - run: make release
+      - run: make test
+      - run: ./bin/librarian --version
+
   # Native MinGW-w64 build on Windows: static exe with llama.cpp built by
   # `make windows`, then a smoke run. The unit tests are POSIX-only for now.
   windows:
@@ -42,7 +53,7 @@ jobs:
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-ninja
       - run: SKIP_LLAMA_BUILD=1 ./setup.sh
-      - run: make WIN_CC=gcc WIN_CXX=g++ windows
+      - run: make windows
       - name: Smoke test
         run: |
           ./bin/librarian.exe --version

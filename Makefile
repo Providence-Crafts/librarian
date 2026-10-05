@@ -72,6 +72,13 @@ LLAMA_LIBS = \
 
 SYS_LIBS = -lstdc++ -lm -lpthread -ldl -fopenmp
 
+# Release binaries: link the GCC runtime (libstdc++, libgomp, libgcc)
+# statically so the executable needs only glibc. gcc only; clang's OpenMP
+# runtime is libomp.
+ifeq ($(STATIC_RUNTIME),1)
+SYS_LIBS = -static-libgcc -Wl,-Bstatic -lstdc++ -lgomp -Wl,-Bdynamic -lm -lpthread -ldl
+endif
+
 # Vulkan backend support
 ifneq ($(wildcard $(LLAMA_BUILD_DIR)/ggml/src/ggml-vulkan/libggml-vulkan.a),)
 # 1. Try pkg-config

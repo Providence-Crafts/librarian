@@ -19,7 +19,7 @@ references:
   - "https://github.com/asg017/sqlite-vec"
   - "https://github.com/ggml-org/llama.cpp"
   - "https://github.com/cktan/tomlc99"
-notes: "Phases 1-18 complete and gate-green; v0.1.0 released, v0.1.1 in progress. Manual checks outstanding below."
+notes: "Phases 1-18 complete and gate-green; v0.1.0 and v0.1.1 released, v0.1.2 in progress. Manual checks outstanding below."
 ---
 
 # librarian
@@ -232,6 +232,8 @@ their outcome.
 - [✓] CI job `ubuntu` without Nix
 - [✓] Releases attach the bare executables; LICENSE in both archives
 - [✓] Version 0.1.1 and `packaging/winget/0.1.1/`
+- [✓] Release Linux executable with a static GCC runtime (`STATIC_RUNTIME=1`),
+      guarded by `ldd` in the release job; version 0.1.2
 
 **Checks**
 
@@ -239,7 +241,11 @@ their outcome.
 
 - [✓] Clean copy in `ubuntu:24.04` and `ubuntu:22.04`: `setup.sh`,
       `make release`, `make test` (23 tests)
-- [ ] CI green on all three jobs; v0.1.1 released and assets verified
+- [✓] CI green on all three jobs (run 37273785819); v0.1.1 released,
+      `sha256sum -c SHA256SUMS` OK, the exe runs under Wine
+- [✓] The 0.1.2 Linux executable links only glibc and runs `--version`,
+      `ingest` and `query` in bare `ubuntu:22.04`, `ubuntu:24.04` and
+      `debian:stable-slim` containers (0.1.1 failed: no `libgomp.so.1`)
 
 ## Deferred work
 
@@ -248,7 +254,7 @@ their outcome.
 | Unit tests on native Windows | Phase 17 | Open. Tests hard-code `/tmp` and use `posix_openpt`; they need `plat_temp_file` and a pty-free path before the Windows CI job can run them. |
 | Completion and history keys on Windows | Phase 16 | Open. The REPL falls back to plain line input; needs a console-input path in `plat_win32.c`. |
 | GPU back ends in release builds | Phase 11 | Open. Vulkan works from source; releases stay CPU-only to avoid a loader dependency. |
-| Fully static Linux binary | Phase 17 | Open. The release links `libstdc++` and `libgomp` dynamically because the Makefile names `-lstdc++` explicitly. |
+| Fully static Linux binary | Phase 17 | Partly done. Since 0.1.2 the release links libstdc++, libgomp and libgcc statically (`STATIC_RUNTIME=1`); glibc stays dynamic, so the floor is glibc 2.35. |
 | macOS in CI | Phase 16 | Open. Builds from source; not exercised. |
 | PDF extraction without `pdftotext` | Phase 16 | Open. The built-in FlateDecode fallback handles simple PDFs only. |
 

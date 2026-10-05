@@ -29,8 +29,8 @@ llama.cpp are compiled in.
 
 **Linux** (x86-64, glibc 2.35 or later): download `librarian-X.Y.Z-linux-x86_64`,
 then `chmod +x` it and put it on your `PATH` as `librarian`, or take
-`librarian-X.Y.Z-linux-x86_64.tar.gz`. It needs `libstdc++` and `libgomp`,
-present on any mainstream distribution.
+`librarian-X.Y.Z-linux-x86_64.tar.gz`. The C++ and OpenMP runtimes are linked
+in, so it needs nothing beyond glibc.
 
 **Windows** (10 1809 or later, x64): `winget install ProvidenceCrafts.librarian`,
 or download `librarian-X.Y.Z-windows-x86_64.exe` (a single static executable)

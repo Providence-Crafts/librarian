@@ -22,7 +22,9 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y cmake
       - run: |
           ./setup.sh
-          make release
+          make release CC=gcc STATIC_RUNTIME=1
+          # Only glibc may be dynamic; a stock install has no libgomp.
+          if ldd bin/librarian | grep -E 'libstdc\+\+|libgomp|libgcc_s'; then exit 1; fi
           v="${GITHUB_REF_NAME#v}"; d="librarian-$v-linux-x86_64"
           mkdir "$d" && cp bin/librarian README.md LICENSE librarian.toml "$d/"
           tar czf "$d.tar.gz" "$d"

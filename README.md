@@ -139,3 +139,7 @@ builds `llama.cpp` without GPU back ends.
 packaging plan, and `docs/family.md` the design contract shared with redstone.
 `make gate` is the single definition of done; `make logo` regenerates
 `docs/logo.svg` from the banner bitmap in `src/brand_art.h`.
+
+## License
+
+GNU General Public License v3.0 or later (`GPL-3.0-or-later`); see [`LICENSE`](LICENSE).

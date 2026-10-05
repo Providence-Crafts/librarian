@@ -4,11 +4,12 @@
 
 # `CC ?=` does not work here: make predefines CC, so ?= never fires.
 # Only override when the value is make's own default.
-# clang when installed (the Nix shell has it), then gcc, then cc, so a plain
-# Ubuntu or MSYS2 install builds without extra flags. clang needs libomp for
-# -fopenmp; without it, `make CC=gcc`.
+# clang when it can link -fopenmp, then gcc, then cc, so a
+# plain Ubuntu or MSYS2 install builds without extra flags. The link probe
+# matters: Ubuntu's clang without libomp-dev compiles fine but fails at -lomp.
+OPENMP_PROBE = echo 'int main(void){return 0;}' | $(1) -fopenmp -x c - -o /dev/null 2>/dev/null && echo $(1)
 ifeq ($(origin CC),default)
-  CC = $(firstword $(foreach c,clang gcc,$(if $(shell command -v $(c) 2>/dev/null),$(c))) cc)
+  CC = $(firstword $(foreach c,clang gcc,$(shell $(call OPENMP_PROBE,$(c)))) cc)
 endif
 STD = -std=c99
 

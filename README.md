@@ -22,25 +22,57 @@ tour.
 
 ## Install
 
-- **Linux** (x86-64): download `librarian-X.Y.Z-linux-x86_64.tar.gz` from the
-  [releases](https://github.com/Providence-Crafts/librarian/releases), check it
-  against `SHA256SUMS`, and put `librarian` on your `PATH`. It needs glibc
-  2.35+, `libstdc++` and `libgomp`, present on any mainstream distribution.
-- **Windows** (10 1809+, x64): `winget install ProvidenceCrafts.librarian` once
-  the manifest is accepted, or unzip `librarian-X.Y.Z-windows-x86_64.zip` from
-  the releases; the `.exe` is static and needs no DLLs.
-- **From source**: see [Build](#build).
+Every [release](https://github.com/Providence-Crafts/librarian/releases)
+carries a ready-to-run executable for each platform, plus an archive that adds
+the README, the licence and an example `librarian.toml`. SQLite, sqlite-vec and
+llama.cpp are compiled in.
+
+**Linux** (x86-64, glibc 2.35 or later): download `librarian-X.Y.Z-linux-x86_64`,
+then `chmod +x` it and put it on your `PATH` as `librarian`, or take
+`librarian-X.Y.Z-linux-x86_64.tar.gz`. It needs `libstdc++` and `libgomp`,
+present on any mainstream distribution.
+
+**Windows** (10 1809 or later, x64): `winget install ProvidenceCrafts.librarian`,
+or download `librarian-X.Y.Z-windows-x86_64.exe` (a single static executable)
+and put it on your `PATH` as `librarian.exe`. `librarian-X.Y.Z-windows-x86_64.zip`
+holds the same executable with the docs.
+
+Check a download against `SHA256SUMS` in the same release. **From source**: see
+[Build](#build); Nix is optional.
 
 Models are not bundled. The first run of `librarian setup` downloads the two
 default models (about 3.5 GB) from Hugging Face with `curl`.
 
 ## Build
 
-Everything happens inside the pinned Nix flake.
+A C99 compiler, a C++ compiler and CMake for llama.cpp, `make`, `git` and
+`curl`. The Makefile uses clang, then gcc, then `cc`, whichever it finds first
+(clang also needs libomp; otherwise `make CC=gcc`). `./setup.sh` fetches
+llama.cpp and tomlc99 at pinned commits into `vendor/` and builds llama.cpp;
+SQLite, sqlite-vec and miniz are already in the repository.
+
+**Ubuntu / Debian** (22.04 or later):
+
+```sh
+sudo apt install build-essential cmake git curl unzip
+./setup.sh             # fetch and build the pinned llama.cpp, fetch tomlc99
+make release           # bin/librarian
+make test              # unit tests under ASan+UBSan
+```
+
+**Windows**, in an [MSYS2](https://www.msys2.org) UCRT64 shell:
+
+```sh
+pacman -S --needed make git curl unzip mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
+SKIP_LLAMA_BUILD=1 ./setup.sh   # sources only; make windows builds its own llama.cpp
+make windows                    # bin/librarian.exe, static
+```
+
+**Nix**: the flake pins every tool used in development.
 
 ```sh
 nix develop            # enter the dev shell once, then run the rest from inside it
-./setup.sh             # fetch SQLite, sqlite-vec, tomlc99 and llama.cpp into vendor/, build llama.cpp
+./setup.sh
 make                   # optimised build -> bin/librarian
 make debug             # debug build
 make test              # unit tests under ASan+UBSan
@@ -48,7 +80,12 @@ make gate              # format check, -Werror build, tests, cppcheck, clang-tid
 ```
 
 `make help` lists every target, including `valgrind`, `tsan`, `tidy`,
-`cppcheck`, `logo`, `compdb` and `watch`.
+`cppcheck`, `logo`, `compdb` and `watch`. `nix develop .#windows`
+cross-compiles `librarian.exe` from Linux (`make windows`).
+
+CI (`.github/workflows/ci.yml`) runs the gate in the Nix shell, the Ubuntu
+route without Nix, and the MSYS2 build on Windows. Pushing a `v*` tag
+publishes the executables and archives (`release.yml`).
 
 ## Usage
 
